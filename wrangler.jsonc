@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "gym-shym",
+	"compatibility_date": "2026-09-10",
+	// nodejs_compat: the app runs on the Node.js runtime (Supabase SSR, server
+	// actions, and proxy.ts all need it). global_fetch_strictly_public makes
+	// fetch() to the Worker's own public hostname go back out through the edge
+	// rather than looping internally — both are required by the adapter.
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	}
+	// Deliberately no R2 incremental cache and no images binding: every route in
+	// this app is server-rendered on demand (Supabase reads cookies on all of
+	// them), there is no ISR / `use cache` / `export const revalidate` anywhere,
+	// and nothing uses next/image. Adding either would mean provisioning buckets
+	// this app would never read from. See docs/DEPLOY.md.
+}
