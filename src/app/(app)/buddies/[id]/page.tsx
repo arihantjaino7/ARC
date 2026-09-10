@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { Card, EmptyState, Screen } from "@/components/Screen";
+import { Button } from "@/components/ui/Button";
+import { Bar } from "@/components/ui/Bar";
+import { Chip } from "@/components/ui/Chip";
 import { createClient } from "@/lib/supabase/server";
 import { getFriendData } from "@/lib/friends/actions";
 import {
@@ -15,7 +18,8 @@ import type {
   ScoreboardResult,
   ScoreboardRuleSummary,
 } from "@/lib/challenges/types";
-import { findMetric, BUILTIN_METRICS } from "@/lib/metrics/types";
+import { getMetrics } from "@/lib/metrics/actions";
+import { findMetric, BUILTIN_METRICS, type MetricDef } from "@/lib/metrics/types";
 import { markChallengeNotificationsRead } from "@/lib/notifications/actions";
 import { daysBetween } from "@/lib/time/day";
 import type { ScoredGoal } from "@/lib/scoring/types";
@@ -23,6 +27,7 @@ import { ChangeRequestPanel } from "./ChangeRequestPanel";
 import { RecentEntriesFeed } from "./RecentEntriesFeed";
 import { GraceButton } from "./GraceButton";
 import { RematchButton } from "./RematchButton";
+import { HeatStrip } from "./HeatStrip";
 
 // A buddy can have more than one challenge on file (completed ones stick
 // around). This picks the one worth showing: an active challenge beats a
@@ -106,11 +111,8 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
           title="No challenge yet"
           body="Start one with this buddy to see your progress side by side."
           cta={
-            <Link
-              href={`/buddies/new?buddy=${buddyId}`}
-              className="rounded-md bg-black px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-            >
-              Start a challenge
+            <Link href={`/buddies/new?buddy=${buddyId}`}>
+              <Button>Start a challenge</Button>
             </Link>
           }
         />
@@ -118,10 +120,11 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
     );
   }
 
-  const [board, changeRequests, recentEntries] = await Promise.all([
+  const [board, changeRequests, recentEntries, metrics] = await Promise.all([
     getScoreboard(chosen.id),
     getChangeRequestsForChallenge(chosen.id),
     getRecentEntries(chosen.id),
+    getMetrics(),
   ]);
 
   // Opening this screen is what "reads" a change-request notification — no
@@ -136,7 +139,7 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
       back={{ href: "/buddies", label: "Buddies" }}
     >
       {"error" in board ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{board.error}</p>
+        <p className="text-body text-clay">{board.error}</p>
       ) : board.participants.length < 2 ? (
         <EmptyState
           title="Waiting on them"
@@ -149,6 +152,7 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
           currentUserId={board.participants.find((p) => p.isCaller)!.userId}
           pendingChanges={changeRequests.filter((r) => r.status === "pending")}
           recentEntries={"error" in recentEntries ? [] : recentEntries}
+          metrics={metrics}
         />
       )}
     </Screen>
@@ -161,12 +165,14 @@ export function Scoreboard({
   currentUserId,
   pendingChanges,
   recentEntries,
+  metrics,
 }: {
   board: ScoreboardResult;
   challengeId?: string;
   currentUserId?: string;
   pendingChanges?: ChangeRequest[];
   recentEntries?: RecentEntry[];
+  metrics?: MetricDef[];
 }) {
   const you = board.participants.find((p) => p.isCaller)!;
   const them = board.participants.find((p) => !p.isCaller)!;
@@ -174,10 +180,8 @@ export function Scoreboard({
   return (
     <div className="space-y-6">
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Overall
-        </p>
-        <div className="mt-2 space-y-1.5">
+        <p className="text-overline text-ink-faint">Overall</p>
+        <div className="mt-3 space-y-3">
           {/* The running total already excludes today's hidden value (unlogged
               scores 0, same rule the rollup applies everywhere else), so
               there's nothing to hide here — only "Today" and the heat
@@ -185,16 +189,14 @@ export function Scoreboard({
           <BarRow label="You" value={you.total} />
           <BarRow label={them.label} value={them.total} />
         </div>
-        <p className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+        <p className="mt-3 text-caption text-ink-faint">
           {board.startDate} &rarr; {board.endDate}
         </p>
       </Card>
 
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          This week
-        </p>
-        <div className="mt-2 space-y-1.5">
+        <p className="text-overline text-ink-faint">This week</p>
+        <div className="mt-3 space-y-3">
           <BarRow label="You" value={you.weekTotal} />
           <BarRow label={them.label} value={them.weekTotal} />
         </div>
@@ -202,17 +204,15 @@ export function Scoreboard({
       </Card>
 
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          By rule
-        </p>
+        <p className="mb-2 text-overline text-ink-faint">By rule</p>
         <div className="space-y-3">
           {board.rules.map((rule) => (
             <Card key={rule.id}>
-              <p className="text-sm font-medium text-black dark:text-zinc-50">
+              <p className="text-body font-medium text-ink">
                 {ruleLabel(rule)}{" "}
-                <span className="font-normal text-zinc-500 dark:text-zinc-400">&middot; {ruleHint(rule)}</span>
+                <span className="font-normal text-ink-muted">&middot; {ruleHint(rule)}</span>
               </p>
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-3 space-y-3">
                 <BarRow label="You" value={you.perRule[rule.id]?.score ?? 0} />
                 <BarRow label={them.label} value={them.perRule[rule.id]?.score ?? 0} />
               </div>
@@ -222,10 +222,8 @@ export function Scoreboard({
       </div>
 
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Today
-        </p>
-        <div className="mt-2 space-y-1.5 text-sm">
+        <p className="text-overline text-ink-faint">Today</p>
+        <div className="mt-3 space-y-2">
           <TodayRow label="You" logged={you.todayLogged} />
           <TodayRow label={them.label} logged={them.todayLogged} hidden={them.todayHidden} />
         </div>
@@ -240,26 +238,24 @@ export function Scoreboard({
       </Card>
 
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Last {you.heatStrip.length} days
-        </p>
+        <p className="mb-2 text-overline text-ink-faint">Last {you.heatStrip.length} days</p>
         <Card>
           <div className="space-y-2">
-            <HeatRow label="You" cells={you.heatStrip} />
-            <HeatRow
+            <HeatStrip label="You" cells={you.heatStrip} />
+            <HeatStrip
               label={them.label}
               cells={them.heatStrip}
               hideDate={them.todayHidden ? board.callerToday : null}
             />
           </div>
-          <p className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-3 text-caption text-ink-faint">
             Blank cells are rest days &mdash; not misses.
             {board.blindMode && them.todayHidden && " Today's cell for them is hidden until you log yours."}
           </p>
         </Card>
       </div>
 
-      <div className="flex gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="flex gap-4">
         <BadgeSummary label="You" badges={you.badges} trustScore={you.trustScore} />
         <BadgeSummary label={them.label} badges={them.badges} trustScore={them.trustScore} />
       </div>
@@ -273,14 +269,13 @@ export function Scoreboard({
           buddyLabel={them.label}
           liveRules={board.rules}
           pending={pendingChanges ?? []}
+          metrics={metrics ?? []}
         />
       )}
 
       {recentEntries && (
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            {them.label}&rsquo;s last 48 hours
-          </p>
+          <p className="mb-2 text-overline text-ink-faint">{them.label}&rsquo;s last 48 hours</p>
           <RecentEntriesFeed entries={recentEntries} />
         </div>
       )}
@@ -308,7 +303,7 @@ function WeeklyRecapLine({
   if (!best && !weakest) return null;
 
   return (
-    <p className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+    <p className="mt-3 text-caption text-ink-faint">
       {best && `Best day: ${best.date} (${best.score}).`}
       {best && weakest && " "}
       {weakest && `Weakest rule: ${ruleLabel(weakest.rule)} (${weakest.sg.score}).`}
@@ -320,13 +315,9 @@ function BarRow({ label, value, hidden }: { label: string; value: number; hidden
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   return (
     <div className="flex items-center gap-2">
-      <span className="w-14 shrink-0 truncate text-[11px] text-zinc-500 dark:text-zinc-400">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        {!hidden && (
-          <div className="h-full rounded-full bg-black dark:bg-white" style={{ width: `${pct}%` }} />
-        )}
-      </div>
-      <span className="w-9 shrink-0 text-right text-[11px] font-medium text-black dark:text-zinc-50">
+      <span className="w-16 shrink-0 truncate text-caption text-ink-muted">{label}</span>
+      <div className="flex-1">{!hidden && <Bar score={pct} />}</div>
+      <span className="w-9 shrink-0 text-right text-caption font-medium tabular-nums text-ink">
         {hidden ? "\u{1F512}" : `${pct}%`}
       </span>
     </div>
@@ -335,50 +326,13 @@ function BarRow({ label, value, hidden }: { label: string; value: number; hidden
 
 function TodayRow({ label, logged, hidden }: { label: string; logged: boolean; hidden?: boolean }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-body text-ink-muted">{label}</span>
       {hidden ? (
-        <span className="text-zinc-500 dark:text-zinc-400">Hidden until you log today</span>
+        <span className="text-right text-caption text-ink-faint">Hidden until you log today</span>
       ) : (
-        <span className={logged ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}>
-          {logged ? "Logged" : "Not yet"}
-        </span>
+        <Chip tone={logged ? "sage" : "neutral"}>{logged ? "Logged" : "Not yet"}</Chip>
       )}
-    </div>
-  );
-}
-
-function heatColor(score: number | null): string {
-  if (score === null) return "bg-zinc-100 dark:bg-zinc-900";
-  if (score >= 90) return "bg-emerald-500";
-  if (score >= 70) return "bg-emerald-300 dark:bg-emerald-800";
-  if (score >= 40) return "bg-amber-300 dark:bg-amber-700";
-  return "bg-red-300 dark:bg-red-900";
-}
-
-function HeatRow({
-  label,
-  cells,
-  hideDate,
-}: {
-  label: string;
-  cells: ScoreboardParticipant["heatStrip"];
-  hideDate?: string | null;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-14 shrink-0 truncate text-[11px] text-zinc-500 dark:text-zinc-400">{label}</span>
-      <div className="flex flex-1 gap-[3px]">
-        {cells.map((cell) => (
-          <div
-            key={cell.date}
-            title={cell.date}
-            className={`h-4 flex-1 rounded-sm ${
-              hideDate === cell.date ? "bg-zinc-300 dark:bg-zinc-700" : heatColor(cell.score)
-            }`}
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -401,8 +355,8 @@ function BadgeSummary({
   ].filter(Boolean);
 
   return (
-    <p>
-      <span className="font-medium text-zinc-700 dark:text-zinc-300">{label}: </span>
+    <p className="min-w-0 flex-1 text-caption text-ink-muted">
+      <span className="font-medium text-ink">{label}: </span>
       {parts.length > 0 ? parts.join(", ") : "clean so far"}
       {trustScore > 0 && ` · trust ${trustScore}`}
     </p>

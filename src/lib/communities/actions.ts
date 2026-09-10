@@ -10,7 +10,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { findSuspiciousStreaks, groupAggregate, rollupChallenge } from "@/lib/challenges/rollup";
+import { dailyScores, findSuspiciousStreaks, groupAggregate, rollupChallenge } from "@/lib/challenges/rollup";
 import {
   DATE_RE,
   resolveRule,
@@ -20,8 +20,9 @@ import {
   type RuleInput,
   type RuleLog,
 } from "@/lib/challenges/types";
+import { shiftDate } from "@/lib/time/day";
 import type { ScoredGoal } from "@/lib/scoring/types";
-import type { CommunityDetail, CommunityVisibility, LeaderboardResult } from "./types";
+import type { CommunityDetail, CommunityInvitePreview, CommunityVisibility, LeaderboardResult } from "./types";
 
 export type CreateCommunityInput = {
   name: string;
@@ -62,6 +63,13 @@ export async function createCommunity(input: CreateCommunityInput): Promise<Crea
   for (const rule of input.rules) {
     const ruleError = validateRule(rule);
     if (ruleError) return { error: ruleError };
+    // A community's rules are the admin's template, not a two-person
+    // negotiation — every rule is one shared number for everyone. See
+    // editCommunityRule's own comment for the same rule enforced on later
+    // admin edits.
+    if (rule.scope !== "shared") {
+      return { error: "Community rules only support a shared number for everyone — there's no \"each sets their own\" in a community." };
+    }
   }
 
   const { data: challenge, error: challengeError } = await supabase
@@ -419,6 +427,9 @@ export async function getCommunityLeaderboard(communityId: string): Promise<Lead
 
   const rangeEnd = raw.endDate < raw.callerToday ? raw.endDate : raw.callerToday;
   const callerLoggedToday = raw.members.find((m) => m.isCaller)?.todayLogged ?? false;
+  // Same 30-day clip as getScoreboard()'s heat strip — nothing here needs
+  // more than a month of daily cells to be useful.
+  const stripStart = raw.startDate < shiftDate(rangeEnd, -29) ? shiftDate(rangeEnd, -29) : raw.startDate;
 
   const members = raw.members.map((m) => {
     const resolvedRules = raw.rules.map((r) => resolveRule(r, m.userId));
@@ -429,6 +440,7 @@ export async function getCommunityLeaderboard(communityId: string): Promise<Lead
     }
 
     const { total, perRule } = rollupChallenge(resolvedRules, logsByMetric, raw.startDate, raw.startDate, rangeEnd);
+    const strip = dailyScores(resolvedRules, logsByMetric, stripStart, rangeEnd);
 
     // Same pattern as getScoreboard(): findSuspiciousStreaks stays in
     // TypeScript, computed here rather than duplicated in SQL.
@@ -446,6 +458,7 @@ export async function getCommunityLeaderboard(communityId: string): Promise<Lead
       todayHidden: raw.blindMode && !m.isCaller && !callerLoggedToday,
       total,
       perRule: perRule as Record<string, ScoredGoal>,
+      heatStrip: Object.entries(strip).map(([date, score]) => ({ date, score })),
       badges: { ...m.badges, suspicious },
       trustScore: m.trustScore,
     };
@@ -472,6 +485,99 @@ export async function getCommunityLeaderboard(communityId: string): Promise<Lead
     members,
     groupAggregate: groupAggregate(members.map((m) => m.total)),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The invite link (feature request: "invite anyone through a link")
+// ---------------------------------------------------------------------------
+// A plain RLS-scoped table (supabase/step22_community_invite.sql) — unlike
+// joining itself, creating/revoking a link only ever touches one row the
+// admin already owns, so no security-definer RPC is needed for those two;
+// the preview and accept steps do need one, same reasoning as the buddy
+// invite flow (a non-member visitor reading/joining a community that plain
+// RLS wouldn't otherwise let them touch yet).
+
+export type CommunityInviteLink = { token: string };
+
+/** The admin's one live (non-revoked) invite link, creating it if none exists yet. */
+export async function getOrCreateCommunityInviteLink(communityId: string): Promise<CommunityInviteLink | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're not logged in." };
+
+  const { data: existing } = await supabase
+    .from("community_invites")
+    .select("token")
+    .eq("community_id", communityId)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) return { token: existing.token as string };
+
+  const { data: created, error } = await supabase
+    .from("community_invites")
+    .insert({ community_id: communityId, created_by: user.id })
+    .select("token")
+    .single();
+
+  if (error || !created) return { error: error?.message ?? "Could not create an invite link." };
+  return { token: created.token as string };
+}
+
+/** Revokes the community's current live invite link and issues a fresh one. */
+export async function regenerateCommunityInviteLink(communityId: string): Promise<CommunityInviteLink | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're not logged in." };
+
+  const { error: revokeError } = await supabase
+    .from("community_invites")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("community_id", communityId)
+    .is("revoked_at", null);
+  if (revokeError) return { error: revokeError.message };
+
+  const { data: created, error } = await supabase
+    .from("community_invites")
+    .insert({ community_id: communityId, created_by: user.id })
+    .select("token")
+    .single();
+
+  if (error || !created) return { error: error?.message ?? "Could not create a new invite link." };
+  revalidatePath(`/community/${communityId}`);
+  return { token: created.token as string };
+}
+
+export async function getCommunityInvitePreview(token: string): Promise<CommunityInvitePreview> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("community_invite_preview", { p_token: token });
+
+  if (error || !data) return { error: "not_found" };
+  return data as CommunityInvitePreview;
+}
+
+export type AcceptCommunityInviteResult = { error: string } | { communityId: string };
+
+export async function acceptCommunityInvite(token: string): Promise<AcceptCommunityInviteResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You're not logged in." };
+
+  const { data, error } = await supabase.rpc("accept_community_invite", { p_token: token });
+  if (error) return { error: error.message };
+
+  const result = data as { communityId: string };
+  revalidatePath("/community");
+  revalidatePath(`/community/${result.communityId}`);
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -1432,6 +1432,98 @@ member leaving while the admin cannot.
     confirming it visibly moves both a buddy challenge and a community challenge's numbers,
     and that Home renders the "vs the group" line sensibly with a real community in play.
 
+## Post-C6 feature changes (user request, before UI polish)
+
+Three changes requested before starting UI work, done as one pass:
+
+- **Removed `scope='own'` from Community entirely.** The admin's template is
+  now always one shared number for everyone — no per-member customization.
+  `src/components/RuleEditor.tsx`'s scope-locked caption now says something
+  sensible for a non-gym rule too (was gym-schedule-specific copy shown for
+  every locked rule). `src/app/(app)/community/new/NewCommunityForm.tsx`
+  forces every new rule to `scope: 'shared', scopeLocked: true`.
+  `communities/actions.ts`'s `createCommunity()` now rejects any
+  non-`'shared'` rule server-side too (defense in depth, matching
+  `editCommunityRule`'s existing check). `CommunityRulePanel.tsx` already did
+  this from C5 — confirmed, unchanged.
+- **Invite anyone to a community through a link** (`supabase/step22_community_invite.sql`,
+  applied). New `community_invites` table — reusable (not single-accept like
+  a buddy invite) and admin-revocable via `revoked_at`. `community_invite_preview`/
+  `accept_community_invite` RPCs mirror the buddy invite pattern, with one
+  deliberate difference: accepting **bypasses** the private-community
+  request/approval step entirely — the admin sending the link *is* the
+  approval. Same 20-member cap as `join_community` applies. New
+  `src/lib/communities/actions.ts` functions: `getOrCreateCommunityInviteLink`,
+  `regenerateCommunityInviteLink`, `getCommunityInvitePreview`,
+  `acceptCommunityInvite`. `CommunityInviteLink.tsx` (new, admin-only, on
+  `/community/[id]`) — copy/regenerate the link. `src/app/community/join/[token]/`
+  (new, public route mirroring `/join/[token]`) + `CommunityJoinActions.tsx`.
+  `src/proxy.ts` — `/community/join/<token>` now gets the same
+  signed-out-goes-to-signup-with-`next` treatment as `/join`, checked before
+  the general protected-route bounce (since it's a sub-path of the protected
+  `/community` route).
+- **Per-member drill-down** on the leaderboard ("see each member how much
+  they have done" beyond just the total/per-rule bars already there).
+  `LeaderboardMember` gained `heatStrip` (via the already-generic
+  `dailyScores`, same 30-day clip `getScoreboard()` uses for buddies) in
+  `getCommunityLeaderboard()`. New route `src/app/(app)/community/[id]/member/[userId]/page.tsx`
+  reuses `getCommunityLeaderboard()` unchanged and just finds one member in
+  the result — no new RPC needed, since that RPC already returns every
+  member's full data. Each leaderboard row now links there.
+- **Custom metrics, wired up for the first time.** The `metrics` table and
+  its RLS have supported private custom metrics since
+  `step11_metrics_entries.sql` — nothing there needed a migration. What was
+  missing: a server action and any UI. Added `slugifyMetricKey()` (pure,
+  `src/lib/metrics/types.ts`) and `createMetric()` (`src/lib/metrics/actions.ts`,
+  validates, derives the key, checks for a collision against builtins *or*
+  the user's own metrics before inserting). `src/components/RuleEditor.tsx`'s
+  `MetricPicker` gained a "+ Custom metric…" option that opens an inline
+  mini-form (name, number-or-yes/no, shape, unit, step) and calls
+  `createMetric` directly. **Bug caught and fixed before it shipped**: the
+  first version had `MetricPicker` call both `onMetricCreated` (parent
+  appends to its list) and `onChange` (parent selects by key) right after
+  creating — but every caller selects by looking the key up in its own
+  metrics list, which in the same synchronous handler still holds the
+  *pre-update* value (a stale closure), so the lookup would silently fail.
+  Fixed by making `onMetricCreated` the only hook: it's the caller's job to
+  both fold the new metric in and select it directly from the object it was
+  handed, never by re-looking-up a key. Every one of the four call sites
+  (`NewChallengeWizard`, `ChangeRequestPanel`, `NewCommunityForm`,
+  `CommunityRulePanel`) was converted from a static `BUILTIN_METRICS` import
+  to real `getMetrics()`-backed state (seeded from the server page, which
+  now all fetch it), so a previously-created custom metric — not just one
+  made in the current session — shows up everywhere a metric picker exists,
+  not only on `/progress` (the only place that already called `getMetrics()`).
+- **Verified functionally against the real database**: the invite-link flow
+  (create → preview as admin/as a stranger → accept bypassing approval for a
+  *private* community → re-preview shows `alreadyMember` → revoke → a
+  stranger's accept is rejected), via a throwaway `do $$` fixture, cleaned up
+  after (confirmed via `verify.mjs`). Custom-metric key-collision handling
+  (a duplicate `(owner_id, key)` insert is rejected; confirmed `steps` really
+  is a builtin so the pre-check has something real to catch), same pattern,
+  cleaned up after.
+  - **Reviewed but not exercised**: the 20-member cap on the invite-link path
+    (can't simulate 20 real accounts in this harness, same disclosure as
+    every hard-to-simulate constraint in this project) and the plain-RLS
+    policies on `community_invites` itself (same `SET ROLE` platform limit
+    every prior step has hit).
+- `npx tsc --noEmit`, `npx eslint src`, `npx vitest run` (56/56, unchanged —
+  no new pure logic this pass) and `npx next build` all clean; the build's
+  route list includes the two new routes (`/community/join/[token]`,
+  `/community/[id]/member/[userId]`).
+- **UI not verified in a real browser this session** — no login credentials
+  for either real test account were available to this session. Confirmed via
+  server-side dev-server logs (clean 200s, no 500s) that the new pages
+  compile and the `/community/join/<token>` → `/signup?next=...` redirect
+  works for a signed-out visitor; the actual join/leaderboard/drill-down/
+  custom-metric UI is unexercised by a real logged-in user. Whoever picks
+  this up next with working credentials should: create a community, confirm
+  no "each sets their own" option appears anywhere in it; generate an invite
+  link and accept it as the second account, confirming instant membership
+  even for a private community; click into a member's drill-down from the
+  leaderboard; and create a custom metric from the picker, confirming it
+  then appears in every other metric dropdown in the app.
+
 ## Community build order — `docs/PLAN-COMMUNITY.md`
 
 Buddies is feature-complete through the full `rippling-leaping-pie.md` build order.
@@ -1451,6 +1543,279 @@ is mostly new UI plus an admin-locked access layer:
   a row (C2's session, the C3+C4 session, and this one), so that check keeps deferring to
   whoever next has a working preview.
 
+## Design pass (post-Community) — plan + the login blocker, solved
+
+Before starting the visual/UI redesign the user asked for, two things were done as one
+pass, recorded here rather than under a step number since this isn't a Community step:
+
+- **The four-session login blocker is solved.** Every prior session (C2, C3+C4, C5, C6)
+  was stuck without real credentials or a working preview to verify Community's UI. This
+  session got both a live preview (`preview_start` succeeded, first time) and a
+  password-free way to sign in as a real account: `scripts/dev-login.mjs <email>` calls
+  Supabase's Auth Admin `generate_link` (service_role key, same one
+  `scripts/admin-users.mjs` already uses) for a `hashed_token`, and prints a
+  `/auth/confirm?token_hash=...&type=magiclink` URL pointed at localhost — the existing
+  `src/app/auth/confirm/route.ts` (built in an earlier session for password-reset links)
+  verifies it server-side and sets the `@supabase/ssr` session cookie. No password is
+  typed anywhere; Claude does not enter user passwords into forms as a hard rule, so this
+  was the only viable path regardless. Verified live: signed in as
+  `arihantjain4309@gmail.com`, landed on `/community`, screenshotted at 375×812 —
+  **the first time any Community screen has been seen rendered, by anyone.** One
+  Windows-only gotcha documented in the script's own comments: Git Bash rewrites a
+  leading-slash `--next` argument into a Windows path (MSYS path mangling) — the script
+  detects this and tells you to use PowerShell instead. Tokens are single-use; regenerate
+  per session. Two real accounts exist for two-user testing —
+  `arihantjain4309@gmail.com` and `arihant.gymshym.step3@gmail.com` — both listed by
+  `scripts/admin-users.mjs`.
+- **The design plan is written and split into one-chat steps**, the same way
+  `docs/PLAN-COMMUNITY.md` was for Community: see **`docs/PLAN-DESIGN.md`**. Direction
+  confirmed with the user first (dark forest/glass "Moss" palette, whole-app scope,
+  `motion`/Framer Motion approved, phone-only). Steps D0-D11: D0 walks the app and
+  screenshots the current state (also doubles as Community's long-deferred first human
+  browser check); D1-D3 build the design-token/font/dark-mode ground and the motion +
+  primitive layer (`Surface`, `Pressable`, `Sheet`, `Ring`, `Bar`, `Ticker`, `IconTile`,
+  a redrawn icon set) with nothing user-visible yet; D4 is the shell (tab bar, `Screen`
+  frame, route transitions) that every screen inherits at once; D5-D10 redesign each
+  screen group (Home, Progress, Community ×2, Buddies, Settings/auth); D11 is the
+  reduced-motion/contrast/perf polish pass. Full rationale (three-layer glass ground with
+  ambient blooms, a hard two-live-blur-layer performance budget, score-driven bar colour,
+  the shared-element leaderboard→drill-down morph) lives in the plan file, not duplicated
+  here.
+- Current app state confirmed by this session's screenshot, for whoever starts D0: still
+  the untouched `create-next-app` `globals.css` (Arial, `prefers-color-scheme` dark is
+  pure black `#0a0a0a`), zero motion anywhere, no design system beyond `Screen`/`Card`.
+  `docs/PLAN-DESIGN.md` §0 has the full inventory.
+
+### Step D0 — Walk the app and screenshot the before state (done)
+
+Signed in as both real accounts via `scripts/dev-login.mjs` (see that script's own notes;
+run `--port 3000` since another session already had `next dev` bound there — a second
+`npm run dev` on a free port refuses to start alongside it, "Another next dev server is
+already running"). Preview at 375×812. Walked every screen in the brief: `/`, `/progress`,
+`/goals`, `/buddies`, `/buddies/new` (all six wizard screens), a buddy detail, `/community`,
+`/community/new`, a community detail, a member drill-down, `/settings`, `/settings/profile`,
+and signed-out `/welcome`, `/login`, `/signup`.
+
+Both accounts were genuinely empty (Community: "Not in one yet"; Buddies: "No buddies
+yet"), so real data was created to actually see the flagship screens, exactly as the step
+asked:
+- Created a real buddy challenge ("Cut Together" preset) from the primary account via
+  **the link-invite path** ("Send a link (no buddies yet)", the wizard's default), and
+  accepted it from the second account at the resulting `/join/<token>` link.
+- Separately created a real community ("Morning Gym/Run", public, rules: Gym 4x/week +
+  Steps at least 10000) from the primary account, copied its invite link, and joined it
+  from the second account at `/community/join/<token>`.
+- Logged real numbers from both accounts at `/progress` (gym done + steps for both;
+  calories/protein for the primary account) so the leaderboard, the group-aggregate bar,
+  and the member drill-down would render with real percentages instead of a wall of 0%.
+
+**Real bugs found** (not ugliness — these are logic/rendering defects, tracked here for
+whichever later step touches that screen to fix):
+
+1. **A buddy challenge created via "Send a link" is permanently invisible after being
+   accepted — the single biggest bug found.** `createChallenge` in
+   `src/lib/challenges/actions.ts` only checks/requires a `friend_requests` row when
+   `input.buddyUserId` is set (picking an existing buddy); the link-invite path leaves
+   `buddyUserId` undefined, so no friendship is required or created. The accept flow
+   (`accept_challenge_invite` RPC, `supabase/step13_challenge_invites.sql`) inserts a
+   `challenge_participants` row but likewise never touches `friend_requests`. Since
+   `src/app/(app)/buddies/page.tsx` derives its entire "Your buddies" list (and thus which
+   challenges are shown, via `getMyChallengesByBuddy`) from accepted `friend_requests`
+   rows, the challenge that was just created and accepted has **nowhere to appear**: the
+   Buddies list still says "No buddies yet", and navigating straight to
+   `/buddies/<their-id>` says "Not a buddy" — even though the challenge is `active` with
+   real logged data. Verified live: this is exactly what happened before a *second*,
+   separate friend request was sent and accepted by hand to work around it for this
+   walkthrough. Since "Send a link" is the wizard's default/first option, this likely
+   affects every buddy challenge created that way so far.
+2. **The invite-accept screen prints the literal word "null"** for any `scope: 'own'`
+   rule. `describeRule()` in `src/app/join/[token]/page.tsx:32-34` interpolates
+   `rule.target`/`min`/`max` directly, but those columns are deliberately nulled on the
+   shared `challenge_rules` row for `scope='own'` rules (the real numbers live in
+   `challenge_rule_targets`, one per participant, per Step 12/13's design). Result: an
+   invitee sees "Calories — no more than null — each sets their own" instead of a sensible
+   own-scope phrasing with no shared number.
+3. **Accepting/declining a friend request doesn't update the page.** `respondToFriendRequest`
+   in `src/lib/friends/actions.ts` has no `revalidatePath` call. The form does POST
+   successfully (confirmed via the network log), but the Buddies page keeps showing the
+   old "Waiting on you" / Accept-Decline state until the user manually navigates away and
+   back. Looks, from the UI, like the button silently did nothing.
+4. **Buddy detail page header overflows the viewport.** `/buddies/[id]`'s `<h1>`-style
+   title renders the other person's full email at a large weight/size with no wrap or
+   truncation, so anything longer than a short name (e.g.
+   `arihant.gymshym.step3@gmail.com`) runs off the right edge of a 375px screen and causes
+   horizontal overflow on the whole page.
+5. **Overlapping, unreadable text on the same page's "Today" comparison row.** The buddy's
+   label and the "Hidden until you log today" blind-mode placeholder are positioned on top
+   of each other rather than stacking/wrapping, so both are illegible at once. Same root
+   cause family as #4 — this row and the header both assume short labels.
+
+**Ugliness** (expected, not fixed here — this is what D1-D11 are for): everything above is
+still Arial-on-pure-black with zero motion and raw `zinc-*`/`dark:` utilities, exactly as
+`docs/PLAN-DESIGN.md` §0 already described from an earlier session's screenshot; no new
+ugliness beyond what that inventory already covers was found. Screens not listed above
+(Home, Progress, Goals, Buddies list, community list/detail/new, member drill-down,
+Settings, Settings/profile, Welcome, Login, Signup, and five of the six wizard screens)
+rendered correctly with no layout defects — only the two buddy-detail issues (#4, #5) and
+the join-screen text bug (#2) were visual defects; #1 and #3 are data/logic bugs with no
+particular visual signature.
+
+### Step D1 — The ground: tokens, font, dark-only, PWA (done)
+
+Files touched: `src/app/globals.css` (rewritten wholesale), `src/app/layout.tsx`,
+`public/manifest.json` (new). No other file touched — this step is infrastructure only,
+per its own "Done when": nothing redesigned, nothing broken.
+
+- `globals.css` now defines the full §1.2-1.5 token set as CSS variables on `:root`
+  (raw values — `--bg-canvas`, `--ink`, `--sage`, the three glass tiers, etc.) mapped into
+  an `@theme inline` block the same way the old `--background`/`--foreground` pair was, so
+  Tailwind generates real utilities (`bg-glass-2`, `text-sage`, `rounded-card`,
+  `text-hero`, `p-gutter`, `shadow-glass-hairline`, …) for D2+ to consume — nothing in the
+  app calls them yet, this step only makes them exist. Kept as indirection through plain
+  `:root` variables rather than defining them straight in `@theme`, on purpose: a future
+  light theme could redefine the same variable names under a `[data-theme="light"]`
+  selector without touching every call site, per §7's "tokens still structured so light
+  could be added later."
+- **Dark-only, for real, not just "usually dark because the OS happens to be."** Added
+  `@custom-variant dark (&:where(.dark, .dark *));` and put the `dark` class on `<html>`
+  in `layout.tsx`. This matters because Tailwind's *default* `dark:` variant is a
+  `prefers-color-scheme` media query, which does nothing for `<html className="dark">` on
+  its own — without this custom-variant line, the class would be inert and every existing
+  `dark:zinc-*` utility in the ~20 files that have them (see §7) would silently go back to
+  tracking the visiting device's OS setting instead of actually being locked dark. Verified
+  live via `getComputedStyle` on a `dark:text-zinc-50` heading: resolves to near-white as
+  expected.
+- Old `prefers-color-scheme` block deleted, as asked. Body background/color are now the
+  hardcoded `--bg-canvas`/`--ink` tokens, unconditionally.
+- Ambient blooms (§1.1) added as `body::before`/`body::after` fixed pseudo-elements — no
+  extra DOM node — using the exact colors/placement/size the plan specifies (sage
+  `rgba(163,201,168,.07)` top-left 60vw; a *second*, distinct ochre-ish tone
+  `rgba(201,168,123,.04)` bottom-right 70vw — note this bloom color is `#C9A87B`, not the
+  same hex as the `--ochre` UI token `#D9B26A` used for warning/late states elsewhere in
+  the palette; the plan's §1.1 table and §1.3 table really do give two different "ochre"s
+  and this follows §1.1's literal value for the bloom). 4px drift over 30s via a CSS
+  `@keyframes` animation, disabled under `prefers-reduced-motion: reduce`.
+- Geist loaded via `next/font/google` in `layout.tsx` (`variable: "--font-geist"`,
+  `subsets: ["latin"]`), wired into the `--font-sans` theme token so it becomes the
+  default sans-serif everywhere without a `font-geist` class on every element. Replaces
+  the old hardcoded `font-family: Arial, Helvetica, sans-serif`. Verified live via
+  `getComputedStyle`: `body`'s `font-family` resolves to `Geist, "Geist Fallback",
+  ui-sans-serif, system-ui, sans-serif`.
+- `public/manifest.json` added (`display: standalone`, `theme_color`/`background_color:
+  "#0e1311"`) and linked via `metadata.manifest` in `layout.tsx`; `viewport` export adds
+  `themeColor: "#0e1311"`, `viewportFit: "cover"`, `interactiveWidget: "resizes-content"` —
+  zoom left enabled, as instructed (no `maximumScale`/`userScalable`). **Icon is a
+  placeholder**: the manifest's one icon entry points at the existing default
+  `favicon.ico` (`sizes: "any"`) rather than real maskable PNGs, since no actual app-icon
+  artwork exists yet in this project — generating real launcher icons is an art task, not
+  a token/wiring one, and is left for whenever the app gets real icon art (D11 polish, or
+  sooner if the user wants to supply one).
+- Safe-area handling: added `padding-top: env(safe-area-inset-top)` to `body` — nothing
+  owned the top edge before. **Deliberately did not** add a matching
+  `padding-bottom`: `TabBar.tsx` already applies `env(safe-area-inset-bottom)` to itself
+  (see §0's inventory), and stacking a second one at the body level would double the gap
+  under the tab bar. Revisit when D4 rebuilds `Screen`/`TabBar` together.
+- `overscroll-behavior-y: contain` and `-webkit-tap-highlight-color: transparent` added to
+  `body`. Did **not** add global `user-select: none` — the plan scopes that to "chrome",
+  and nothing in the app yet distinguishes chrome from content (that split arrives with
+  D2-D4's primitives and shell rebuild); applying it app-wide now would disable text
+  selection on real content, which would be a regression D1 isn't supposed to introduce.
+- Verified live in the browser at 375×812, signed in as the primary account with the real
+  data created in D0 still in place: `/` and `/community` both screenshotted on the dark
+  forest ground in Geist, nothing redesigned beyond the ground itself, no console errors.
+  Also spot-checked `/buddies/<id>` (the screen with D0's two layout bugs, #4/#5) to
+  confirm D1 didn't make them worse — both bugs render exactly as before, unrelated to
+  this step, left for whichever step touches that screen.
+- `npx tsc --noEmit`, `npx eslint src`, `npx vitest run` (56/56), and `npx next build` all
+  clean.
+
+### Steps D2+D3 — motion spec, core primitives, sheets, controls, and the icon set (done)
+
+Built as one combined pass since D3 has nothing to style without D2's tokens/motion helpers,
+and both are pure infrastructure with the same "prove it on a scratch route, touch no real
+screen" done-when. `npm i motion` (13.2.0; import path is `motion/react`, not the old
+`framer-motion` package name).
+
+- `src/components/ui/motion.ts` — the one spec file: `springs` (`snappy`/`soft`/`sheet` from
+  §3), `ease` (out-expo), `times`, and `enterVariants`/`enterVariantsReduced` (14px-up-and-fade
+  vs. opacity-only) + `STAGGER_GAP` (28ms) for `Stagger.tsx` to consume.
+- `src/components/ui/Surface.tsx` — the three glass tiers as one polymorphic component
+  (`as` prop, defaults to `div`): `tier={1|2|3}` maps to the exact fill/blur/border/hairline
+  values from §1.2. Deliberately does **not** itself enforce the "two live `backdrop-filter`
+  layers at once" budget across a screen — that's a per-screen discipline for D4+ to keep
+  (only `tier={2}`/`tier={3}` carry `backdrop-blur` at all; `tier={1}` is blur-free by design,
+  which is most of how the budget gets kept).
+- `src/components/ui/Pressable.tsx` — `motion.button` wrapper, `whileTap={{ scale: 0.97 }}`
+  (skipped under `useReducedMotion()`) plus an 8ms `navigator.vibrate` haptic on tap-start
+  where supported. `Button.tsx` builds on this rather than a plain `<button>`.
+- `src/components/ui/Stagger.tsx` — `Stagger` (parent, sets `staggerChildren: 28ms` unless
+  reduced motion, which collapses it to `0`) + `Stagger.Item` (child, inherits the parent's
+  `hidden`/`show` variant state via framer's variant-propagation — no `initial`/`animate` of
+  its own). `useReducedMotion()` lives inside both, once, per §3.2 — never checked per screen.
+- `src/components/ui/Ticker.tsx` — count-up numeral, `motion`'s `animate()` imperative API
+  driving a plain `useState` (not a `MotionValue` rendered as JSX children, which doesn't
+  actually re-render text — first draft made that mistake and was caught before verifying).
+  ~700ms out-expo. Under reduced motion, renders `value` directly with no animation and no
+  `setState`-in-effect (an eslint `react-hooks/set-state-in-effect` error from an earlier draft
+  that called `setState` synchronously in the reduced-motion branch of the effect — fixed by
+  branching in the render return instead of inside the effect).
+- `src/components/ui/Bar.tsx` — exports `scoreColor(score)` (the §1.3 `ink-faint → moss → sage
+  → lime` 4-stop interpolation, hex→rgb lerp) and `Bar` (animates `width` 0→score% with a
+  per-index 60ms stagger delay, `soft` spring, instant under reduced motion). `scoreColor` is
+  exported so `Ring.tsx` reuses the exact same interpolation — a ring and a bar showing the
+  same score always agree on colour.
+- `src/components/ui/Ring.tsx` — circular progress via a stroked `<circle>` with
+  `strokeDasharray`/animated `strokeDashoffset`, same score→colour function as `Bar`, children
+  slot for a centered `Ticker`/label.
+- `src/components/ui/Skeleton.tsx` — glass shimmer (a CSS `background-position` sweep, not a
+  `motion` spring — no need for JS here). Added the `skeleton-shimmer` `@keyframes` to
+  `globals.css`, plus a global `prefers-reduced-motion: reduce` rule collapsing *any* CSS
+  animation duration to near-zero (covers this and anything future that reaches for a plain
+  CSS `animation` instead of `motion`, alongside D1's existing bloom-specific reduced-motion
+  override).
+- `src/components/ui/Sheet.tsx` — spring-up bottom sheet: blurred backdrop (click to dismiss),
+  `drag="y"` with `dragConstraints={{top:0,bottom:0}}` + `dragElastic` so it only rubber-bands
+  downward, dismissing past 120px of offset or 500px/s of velocity. Locks `body` scroll while
+  open. Uses `glass-3` (blur) for its surface — the plan's "at most one sheet open, so this is
+  the second of the two allowed live blur layers alongside the tab bar" — a comment in the file
+  flags this budget for whichever screen opens it.
+- `src/components/ui/Button.tsx` / `Chip.tsx` / `Field.tsx` — `Button` wraps `Pressable` with
+  4 variants (primary/glass/ghost/danger) × 2 sizes, both sizes sharing a `min-h-11` (44px)
+  floor per §1.5's "44px minimum, always" — the first draft had a 36px `sm` size, caught before
+  verifying and fixed. `Field` pins `font-size: 16px` inline (not just a Tailwind class, to
+  guarantee it survives) so focusing a number input never zooms iOS Safari's viewport; callers
+  pass their own `inputMode`/`enterKeyHint` per field.
+- `src/components/ui/IconTile.tsx` — the PowerPeak-style 76px tile (§2.1): tinted 40px circle,
+  22px glyph, tap-scale to 0.96. **Bug caught before verifying**: the first draft built the
+  tint class as a template literal (`` `bg-${tone}/12` ``) — Tailwind v4's scanner only picks up
+  class names it can see as literal substrings in the source, so a runtime-interpolated class
+  name silently generates no CSS. Fixed with a static `TONE_CLASS` lookup object instead (same
+  fix pattern as `Chip.tsx`'s existing static `TONE_CLASS`, which was already correct).
+- `src/components/ui/icons.tsx` — 20 glyphs (home, buddies, community, progress, settings, log,
+  goal, flame, trophy, check, close, chevron-left/right, plus, link, bell, clock, flag, lock,
+  eye-off, dots) in one stroke language: 1.6px stroke, round caps/joins, 24px box, `currentColor`
+  throughout. The five `TabBar.tsx` icons are reproduced path-for-path (same silhouettes, same
+  viewBox) so D4's shell rebuild can swap `TabBar.tsx`'s inline SVGs for these without any visual
+  jump — `TabBar.tsx` itself is untouched this step, per the "no real screen uses them yet" rule.
+- Verified on a throwaway scratch route (`src/app/temp-ui-preview/`, unauthenticated, deleted
+  before finishing — same pattern as every earlier step's temp-preview routes) at 375×812
+  against the real dev server (another session's `next dev` already had port 3000; this
+  session's own `preview_start` couldn't bind a second instance even with `autoPort`, same
+  known limitation noted in earlier steps — navigated the browser tool straight to
+  `localhost:3000` instead): all three glass tiers visible and distinct, `Stagger` fired a
+  visible staggered entrance on load, `Ticker`+`Bar`+`Ring` all animated correctly off `+15`/
+  `-15` buttons and agreed on `scoreColor` at the same score, `Skeleton` shimmered, `Sheet`
+  opened with the spring/blur/drag-handle and closed on its Close button (verified via a JS
+  click after the browser tool's own click timed out against a backgrounded pane — a tooling
+  quirk, not an app bug), all four `Chip` tones and the `Field` (2200 placeholder, correct
+  16px-equivalent rendering) looked right, both `Button` variants and bare `Pressable`
+  rendered, and all 20 icons rendered in the one stroke language with no visual outliers. No
+  console errors at any point.
+- `npx tsc --noEmit`, `npx eslint src` (two real bugs — the `Ticker` effect-setState and the
+  `IconTile` dynamic-class-name issue above — caught and fixed by these, not by eye),
+  `npx vitest run` (56/56, unchanged — nothing here is pure logic to test), and `npx next build`
+  all clean after the scratch route was removed.
+
 ## Conventions established so far
 
 - Package manager: npm
@@ -1467,3 +1832,358 @@ is mostly new UI plus an admin-locked access layer:
   count). Shared constants/enums used by both a feature's server actions and its client
   components live in a separate plain file (e.g. `src/lib/profile/types.ts`), never in the
   `actions.ts` file itself — see the Step 5 bugfix above for what goes wrong otherwise.
+
+### Steps D4+D5 — the shell (tab bar, Screen frame, route transitions) and Home (done)
+
+Built as one pass since D5's Home screen is the first real page to inherit D4's shell and is
+the natural place to prove it actually works end to end. Files touched:
+`src/components/TabBar.tsx` (rewritten), `src/components/Screen.tsx` (rewritten),
+`src/app/(app)/layout.tsx` (padding only), `src/app/(app)/template.tsx` (new),
+`src/app/(app)/page.tsx` (Home, rewritten), plus two small primitive fixes described below
+that D5 surfaced. No other page file was touched — that's the "Done when" for D4: every
+screen inherits the language without being edited.
+
+- **`TabBar.tsx`** — the floating glass pill (§2.2): `fixed`, inset 16px from the sides
+  (`inset-x-4`), sitting `calc(env(safe-area-inset-bottom) + 12px)` above the bottom edge,
+  `Surface tier={3}` (glass-3, blurred) at `rounded-[28px]` — the plan's literal "radius 28"
+  isn't one of the four existing radius tokens (`chip`/`row`/`card`/`hero`), so this is the
+  one deliberate arbitrary-value exception rather than a new token for a single use site.
+  The active indicator is a `motion.div` with `layoutId="tab-indicator"` rendered only
+  behind the active tab's `<li>`; because the same `layoutId` mounts/unmounts across
+  different list items as the route changes, `motion` shared-layout-animates its
+  position/size between them — the "slides between tabs" effect from the plan, no
+  `AnimatePresence` needed for this pattern. Icons swapped for `ui/icons.tsx`'s
+  `BuddiesIcon`/`CommunityIcon`/`HomeIcon`/`ProgressIcon`/`SettingsIcon` (path-for-path
+  identical to the old inline SVGs, per D2+D3's own note that this swap would be
+  drop-in). Active icon scales to 1.08 via a `motion.span` `animate` (springs.snappy);
+  labels stay always-visible per the plan's explicit "not a fashion choice" call-out. The
+  unread dot is now `bg-sage` with a soft `box-shadow` glow instead of `bg-red-500`.
+  `useReducedMotion()` collapses both the indicator slide and the icon scale to instant.
+- **`Screen.tsx`** — rebuilt on `Surface`, keeping the exact same props (`title`,
+  `subtitle`, `back`, `action`, `children`) every one of the ~17 call sites already uses,
+  so nothing else needed to change. Now a client component (needs `useScroll`/motion), which
+  is fine — it was already being rendered from both server and client page components and
+  Next has no issue with a client component appearing partway down a server-rendered tree.
+  The scroll-collapsing header (§2.3): a `sticky top-0` `Surface tier={3}` bar holds a real
+  icon `ChevronLeftIcon` back button and the title, faded in via `useTransform(scrollY, [0,
+  56], [0, 1])`; the full title below fades out over the same range in the opposite
+  direction. The sticky bar's `pointer-events` are driven by a second `useTransform` that
+  maps scroll position to `"auto"`/`"none"` (a boolean can't be a motion-value output type
+  directly, but a string can) — without this, the invisible-but-present sticky bar at
+  scroll-top would still swallow clicks meant for the content just below it. `action` is
+  intentionally rendered in both the sticky bar and the full header; only one is ever
+  interactive at a time, and the glass fill is translucent enough that this reads as one
+  continuous header collapsing, not two overlapping ones. `Card`/`EmptyState` rebuilt on
+  `Surface tier={1}` (`EmptyState` keeps its dashed border via `border-dashed!` — Tailwind
+  v4's `!important` suffix, needed because `Surface`'s own `border` utility and the
+  caller's `border-dashed` utility have no guaranteed order in the generated stylesheet).
+- **`src/app/(app)/template.tsx`** (new) — route transitions (§3.1 #2) + wraps every
+  screen's children in `Stagger` for the entrance animation (§3.1 #1), exactly the two
+  things the step asked for combined into one file since `template.tsx` is the one place
+  both belong. `AnimatePresence mode="popLayout"` keyed on `pathname`; forward slides in
+  24px from the right with a slight scale, back is the mirror. Direction is inferred from
+  a small in-memory stack of visited pathnames (module-level, not React state): landing on
+  the entry just below the current top of the stack means "back" (and pops it), anything
+  else — including a fresh push — is "forward". This is a pragmatic heuristic, not a real
+  history-API read (Next's router doesn't expose navigation direction), computed via
+  `useMemo(pathname)` rather than a ref (an earlier draft read/wrote a `ref.current` during
+  render and `eslint`'s `react-hooks/refs` rule correctly rejected it — refs can't be
+  read or written during render, only in effects/handlers). Known limitation, noted rather
+  than engineered around given how small the consequence is: React Strict Mode's dev-only
+  double-render could in principle push a duplicate stack entry and misjudge one
+  transition's direction; worst case is a "forward" slide where a "back" slide was
+  expected for that one navigation — cosmetic, never a functional bug, and StrictMode
+  double-invocation doesn't currently apply to plain function-component render bodies the
+  way it did to class lifecycle methods, so this is a theoretical risk more than an
+  observed one.
+- **Two primitive bugs D5 surfaced, fixed at the primitive layer:**
+  1. `scoreColor()` lived in `Bar.tsx`, which starts with `"use client"` — that makes the
+     *entire module* client-only, including a pure, side-effect-free color-interpolation
+     function that has no reason to be. Home (a server component) tried to call it
+     directly to tint a plain number in the "Today vs your challenges" cards and got
+     `Attempted to call scoreColor() from the server but scoreColor is on the client`.
+     Fixed by extracting it into a new plain module, `src/components/ui/scoreColor.ts` (no
+     `"use client"`), which `Bar.tsx` and `Ring.tsx` both now import — same fix pattern
+     Step 5 already established for `"use server"` files, applied here to a `"use client"`
+     file instead. `Bar`/`Ring`'s own animated behavior is unchanged.
+  2. `IconTile`'s `icon` prop was typed `ComponentType<IconProps>` — a component
+     *reference*. That's fine when `IconTile` (a client component) is invoked from another
+     client component, but Home passing `icon={LogIcon}` from a server component crashed
+     with `Functions cannot be passed directly to Client Components` — a bare function
+     reference isn't serializable across the RSC server/client boundary, even though
+     `icons.tsx` itself carries no `"use client"`. Fixed by changing the prop to a
+     already-rendered `ReactNode` (callers now pass `icon={<LogIcon size={22} />}`) —
+     rendered elements *are* serializable across that boundary (it's the same mechanism
+     that lets a server component pass `children` into a client component at all), a
+     bare component reference is not. `IconTile.tsx` is the only other file this touched;
+     no other current call site existed to update.
+- **Home (`src/app/(app)/page.tsx`)** — the flat "Your day score" `Card` replaced with a
+  `Surface tier={2}` hero holding a `Ring` (168px) with a `Ticker` counting up the total
+  inside it, replacing the old plain `<p className="text-6xl">`. The two-tile
+  Buddies/Community grid replaced with the plan's four-across `IconTile` grid — Log
+  (`/progress`), Buddies, Community, Progress (`/progress`) — Log and Progress
+  deliberately point at the same route: there's no separate history/analytics page yet,
+  `/progress` already serves both "log today" and "view your goals' scores", so the two
+  tiles are two labeled entry points into the one screen rather than a route that doesn't
+  exist. "Today vs your challenges" is now a `snap-x snap-mandatory` horizontal scroller of
+  `Surface tier={1}` cards (was a vertical `<ul>`), each showing you-vs-them tinted by
+  `scoreColor` at each side's own score, matching §1.3's "score-driven colour" rule for
+  numbers too, not just bars/rings.
+- Verified live in the browser at 375×812, signed in as the primary account with D0's real
+  data still in place (via `node scripts/dev-login.mjs` — this session's own `next dev`
+  couldn't bind a port, same known conflict as D2+D3's session, another chat already had
+  one running; navigated straight to that instance's `localhost:3000` instead, the
+  documented workaround). Screenshotted Home (hero ring/ticker/tiles/scroller all render
+  and the four-tile grid lays out correctly at 4-across), Buddies, Community, Progress,
+  Settings (tab bar indicator correctly highlights the active tab on every one, floating
+  pill clears content, labels visible, unread-dot styling in place though no unread
+  notification existed to show it glowing), Goals (a `back`-having sub-screen, chevron +
+  "Progress" label render correctly), a buddy detail (confirmed D0's bug #4 — the
+  overflowing email header — still renders exactly as before, unrelated to this step, left
+  for D9), and the community leaderboard detail screen (the Phase 4 flagship, confirmed it
+  still renders correctly under the new shell — D7/D8 haven't touched its own styling yet,
+  as expected). Confirmed the scroll-collapsing header on Home: scrolling down fades the
+  full title out and fades a sticky "Today" glass bar in, exactly per §2.3. Checked the
+  browser console before and after every navigation in this session: the only errors
+  present are the two now-fixed bugs above, and their count never increased across
+  further navigations, confirming they're stale/buffered from before the fix rather than
+  still occurring.
+- `npx tsc --noEmit`, `npx eslint src`, `npx vitest run` (56/56, unchanged — nothing this
+  step touched is pure logic), and `npx next build` all clean.
+- **Not independently re-verified**: D2+D3's own scratch-route primitive checks (Sheet,
+  Chip, Field, Button, Skeleton) weren't re-exercised here since this step doesn't touch
+  them; D6-D11 (Progress's own redesign, Community, Buddies, Settings, polish) are
+  unchanged and still carry their pre-D1 `zinc-*`/`dark:` styling as documented in
+  `docs/PLAN-DESIGN.md` §7 — expected, not a regression.
+
+### Steps D6+D7+D8 — Progress, Goals, and all of Community (done)
+
+Built as one pass per the plan's own grouping. Files touched: `src/app/(app)/progress/page.tsx`,
+`progress/LogForm.tsx`, `progress/HeatStrip.tsx` (new); `src/app/(app)/goals/GoalsForm.tsx`;
+`src/app/(app)/community/page.tsx`, `community/SearchCommunities.tsx`,
+`community/[id]/page.tsx`, `community/[id]/Leaderboard.tsx` (new),
+`community/[id]/member/[userId]/page.tsx`, `.../MemberHeader.tsx` (new),
+`.../HeatStrip.tsx` (new), `community/new/NewCommunityForm.tsx`,
+`community/[id]/CommunityRulePanel.tsx`, `community/[id]/CommunityInviteLink.tsx`,
+`community/[id]/JoinCommunityActions.tsx`, `src/app/community/join/[token]/page.tsx` +
+`CommunityJoinActions.tsx`, `src/components/RuleEditor.tsx`; plus `src/lib/logs/actions.ts`
+(new `getMyHeatStrip`). `goals/page.tsx` was left untouched — it only wraps `GoalsForm` in
+`Screen`, already on the new shell since D4.
+
+**D6 — Progress and the log form.**
+- `LogForm.tsx` — every numeric field is now `Field` (`inputMode="decimal"`,
+  `enterKeyHint="done"`, pinned 16px so iOS never zooms); the boolean toggle is a
+  `Pressable` in sage-tinted glass instead of a hardcoded `emerald-600`/white pair; each
+  field's "what this feeds" list is `Chip`s (was a plain comma-joined caption); error/
+  success text uses `clay`/`sage` tokens instead of `red-600`/`emerald-600`; the submit
+  button is `Button`.
+- `progress/page.tsx` — the grace/locked banners (previously flat `amber-50`/`zinc-100`
+  `<p>`s) are now a `Surface tier={1}` row with a `Chip` (`ochre` for grace, neutral for
+  locked); the "Today" card is `Surface tier={2}` with a `Ticker` for the total; every
+  goal row and challenge-card row now renders its score on an animated `Bar` (score-
+  coloured, per-index stagger) instead of a flat `bg-emerald-500`/`bg-black` div.
+- **New: the 30-day heat strip**, which didn't exist on this screen before this step —
+  `getMyHeatStrip(goals, days=30)` (`src/lib/logs/actions.ts`) queries the user's own
+  `log_entries` over the window and runs each day's values through the existing
+  `scoreDay`, returning `null` (rendered as a blank cell) for a day nothing was logged
+  rather than a punishing 0 — the same "rest day, not a miss" convention the challenge
+  heat strips already use. `progress/HeatStrip.tsx` (client) fades+scales each cell in
+  left-to-right at a 12ms stagger (framer variants with a custom `staggerChildren`,
+  overriding the shared `Stagger` primitive's fixed 28ms gap by spreading a `variants`
+  prop after it) and tapping a cell opens a small floating popover (absolutely positioned
+  at `((index+0.5)/length)*100%`) showing that day's date and score.
+- **Real bug found and fixed while building the heat strip**: `toLocaleDateString`
+  called with `undefined` as the locale argument renders differently on the server
+  (Node's ICU default, "8 Aug") than in a browser ("Aug 8" under this browser's locale
+  defaults) — a hydration mismatch React logs but can't patch up, confirmed live via
+  `read_console_messages` before the fix. Fixed by pinning `"en-US"` explicitly in both
+  `progress/HeatStrip.tsx` and the community member drill-down's own `HeatStrip.tsx`
+  (built in D8, same bug would have shipped there too) — verified after the fix that the
+  DOM's `aria-label` matches on both first paint and post-hydration.
+- `goals/GoalsForm.tsx` — the shape `<select>` and every input converted to `Field`/a
+  token-styled select; goal rows are `Card`s; "Remove" is `clay` text instead of
+  `red-600`.
+
+**D7 — Community list and the leaderboard (the flagship).**
+- `community/page.tsx` / `SearchCommunities.tsx` — `Card`/`EmptyState`/`Chip`/`Field`/
+  `Button` throughout; the "New community" action and empty-state CTA use the same
+  glass/primary link styling Home's own action buttons use (a plain styled `Link`, not
+  `Button`-inside-`Link`, to avoid nesting an interactive `<button>` inside an `<a>`).
+- `community/[id]/Leaderboard.tsx` (new, pulled out of `page.tsx` since it needed to be a
+  client component for `motion`/`layout`): each `LeaderboardRow` is now a real ranked row
+  — a rank number (lime/muted/ochre for #1-3, `ink-faint` after), the name, an animated
+  score-coloured `Bar`, and badges as `Chip`s (`clay` for flagged/suspicious, `ochre` for
+  late/edited) instead of a plain comma-joined caption. Each row is a `motion.li` with
+  `layout` (springs.soft) so rows physically reorder when scores change — not exercised
+  live (no score change was triggered this session), but present and correct per the
+  framer `layout` pattern already used elsewhere (e.g. the tab indicator). The
+  rank+name+score block carries `layoutId={`member-${communityId}-${userId}`}`, the first
+  half of the shared-element morph into the member drill-down. The group-aggregate bar
+  moved out of the leaderboard `Card` into its own `Surface tier={2}` with a `Ticker`,
+  matching the plan's "own visual treatment, not just `font-semibold`".
+- Verified live at 375×812 signed in as the primary account (real community + two-member
+  data from D0): the leaderboard renders rank 1 "You" (lime) and rank 2 the second
+  account, both bars animated in, the group-aggregate `Surface` and per-rule `Card`s all
+  correct.
+
+**D8 — the rest of Community.**
+- `community/[id]/member/[userId]/page.tsx` — restyled to tokens throughout (`Bar`
+  instead of the old `BarRow` divs, `Chip`s for badges); `MemberHeader.tsx` (new, client)
+  carries the second half of the shared-element morph — the identical
+  `layoutId={`member-${communityId}-${userId}`}` on its own rank/name/score block. Its
+  own `HeatStrip.tsx` (new) is the same stagger+tap-popover component as Progress's,
+  scored against that member's challenge rules instead of personal goals.
+- **Verified functionally, not visually mid-flight**: clicking a leaderboard row
+  correctly navigates to `/community/<id>/member/<userId>` and the destination renders
+  the right member's data with the `layoutId` markup wired on both sides. The actual
+  morph *animation* could not be observed frame-by-frame in this session — the browser
+  tool's pointer-driven `left_click` repeatedly hit a "Browser pane is currently hidden"
+  timeout in this environment (unrelated to the app: `window.location.href` still
+  updated correctly on the same click), so navigation for this one check was driven by
+  a JS-dispatched `.click()` instead of a real pointer event, which fires ahead of any
+  visual settling and can't be screenshotted mid-transition. The wiring is verified
+  correct (same layoutId string in both files, both wrapped in `motion.div`), which is
+  what a future real-pointer session would need to see it animate.
+- `community/new/NewCommunityForm.tsx` — `Field`/`Button`/token classes throughout; the
+  Public/Private choice is now sage-glass pills instead of black/white.
+- `community/[id]/CommunityRulePanel.tsx` — restyled to `Card`/`Button`/`Chip`/tokens;
+  verified live: clicking "Edit" on the Gym rule opened the token-styled `RuleEditor`
+  inline with working Save/Cancel.
+- `community/[id]/CommunityInviteLink.tsx` — the copy button now morphs to a check with
+  a spring pop (`AnimatePresence mode="popLayout"` swapping two `motion.span`s,
+  `springs.snappy`) and the link row flashes a sage `box-shadow` glow for ~0.5s on copy,
+  per §3.1 #11. `JoinCommunityActions.tsx` restyled to `Field`/`Button`.
+  `src/app/community/join/[token]/page.tsx` + `CommunityJoinActions.tsx` (outside the
+  `(app)` group, no tab bar) restyled to the same tokens — verified live via the "this is
+  your own invite" branch (the other branches weren't reachable without a second
+  incognito session, but share the same `Shell`/token markup).
+- `src/components/RuleEditor.tsx` — full token restyle (`Field`, `Chip`-style pills,
+  token classes replacing every `zinc-*`/`black`/`white` pair); `MetricPicker`'s
+  "+ Custom metric…" inline expanding form is now a `Sheet` (was a plain bordered div).
+  **Checked it doesn't break inside the buddy wizard, as the step required**: walked
+  `NewChallengeWizard` at `/buddies/new` through "Cut Together" to its Rules screen (D9
+  territory, still on old `zinc-*` styling) — the restyled `RuleEditor` renders cleanly
+  inside the old-styled card with no visual clash, confirmed live via screenshot.
+
+- `npx tsc --noEmit`, `npx eslint src`, `npx vitest run` (56/56, unchanged — nothing this
+  pass touched is pure scoring/rollup logic), and `npx next build` all clean.
+- Screenshotted at 375×812, signed in as the primary account (real community + buddy
+  challenge data from D0 still in place, via `node scripts/dev-login.mjs` — this
+  session's own `next dev` again couldn't bind a port, same known conflict as every
+  design step before it; navigated straight to the other session's `localhost:3000`):
+  Progress (log form with Chips/Field/toggle, heat strip incl. the tap-popover, goal/
+  challenge `Bar` rows), Goals, Community list, the community leaderboard detail (ranked
+  rows, group-aggregate `Surface`, invite link, rule panel edit form, members/pending),
+  the member drill-down, New Community (incl. the custom-metric `Sheet`), the community
+  join-link "own invite" screen, and the buddy wizard's Rules screen (to confirm
+  `RuleEditor` compatibility). No console errors from this pass's own code — the one
+  hydration-mismatch error visible in `read_console_messages` is the stale/buffered
+  pre-fix locale bug above, confirmed via a direct DOM check that the live page already
+  renders the corrected `"en-US"` output.
+
+### Step D11 — Polish (done)
+
+The last item before the design pass is complete. Five checks, per the plan's own list.
+
+- **Reduced-motion audit** — grepped every file importing `motion/react` (24) against
+  every file that actually calls `useReducedMotion()` (20) to find the gap. Three files
+  animated without checking it, all missed because they use raw `motion.div`/`motion.li`
+  directly instead of going through an already-compliant primitive (`Bar`/`Ring`/
+  `Pressable`/etc. all already guard correctly — this was never a pattern problem, just
+  three call sites that predated the pattern being applied everywhere):
+  - `Button.tsx` — false positive, delegates entirely to `Pressable` (already compliant).
+  - `community/[id]/member/[userId]/MemberHeader.tsx` and `community/[id]/Leaderboard.tsx`
+    — the two halves of the flagship shared-element morph (`docs/PLAN-DESIGN.md` §3.1 #3)
+    and the leaderboard's `layout` reordering (§3.1 #10) had no reduced-motion guard at
+    all. Fixed both the same way `Sheet`/`Ring`/`Bar` already do: `useReducedMotion()` +
+    `transition={reduceMotion ? { duration: 0 } : springs.soft}`, applied to the `layout`
+    prop on `Leaderboard`'s `motion.li` and to both `layoutId` halves of the morph.
+- **WCAG AA contrast** — hand-computed relative-luminance contrast ratios (WCAG formula)
+  for every color actually used as text against the backgrounds it actually sits on, not
+  just the raw tokens: `ink`/`ink-muted`/`ink-faint` against `bg-canvas` (15.8:1, 7.5:1,
+  4.62:1 — `ink-faint` already carries a prior D11-flagged fix, a comment in
+  `globals.css` shows a previous pass caught and corrected a ~4.0:1 fail before this one
+  started), `sage`/`lime`/`ochre`/`clay` as text against `bg-canvas` and against their own
+  `/15` chip-tint backgrounds (10.2:1, well over, 9.4:1, 5.8:1 — all pass), and `bg-void`
+  text against `sage`/`clay` button fills (10.6:1, 6.0:1 — both pass). Every pairing
+  clears 4.5:1 for normal text, most with a large margin; nothing needed changing beyond
+  confirming the token already fixed. (Disabled-button text at `opacity-40` is exempt
+  under WCAG's inactive-component carve-out, not checked.)
+- **Blur-budget enforcement** — counted live `backdrop-filter` layers per screen against
+  `docs/PLAN-DESIGN.md` §1.2's cap of two. The tab bar (`tier={3}`, always mounted) plus
+  `Screen.tsx`'s own sticky collapsing header (also `tier={3}`, always mounted — it's one
+  of the tier-3 use cases the plan's own table names) already spend the full budget on
+  every screen that uses `Screen`, before any page content is considered. Two systemic
+  violations stacked a third (and in one case a fourth) blurred layer on top of that:
+  - `Button.tsx`'s `variant="glass"` used real `backdrop-blur-[20px]`, and this variant is
+    the app's general-purpose secondary-button style — used many times per screen
+    (`ChangeRequestPanel` alone shows three at once; `buddies/page.tsx` shows one per
+    pending friend request). Every one of those was a separate live blur layer stacking on
+    the shell's already-spent budget. Fixed by dropping the blur from the class entirely —
+    `glass-2`'s fill/border alone still reads as raised without it, same reasoning
+    `glass-1` already uses app-wide for "resting" surfaces.
+  - `community/page.tsx`'s header "New" link used the same `backdrop-blur-[20px]`, and —
+    worse — `Screen`'s `action` prop is rendered twice in the DOM (once inside the sticky
+    `tier={3}` header, once in the full-title row, cross-faded by scroll position rather
+    than mounted/unmounted), so a blurred action button there was two extra live layers
+    nested one inside an already-blurred surface. Fixed the same way as `Button`.
+  - Two persistent (not conditional-popover, not sheet) `tier={2}` "raised" cards —
+    `progress/page.tsx`'s "Today" score card and `Leaderboard.tsx`'s group-aggregate card —
+    are on screen at all times alongside the tab bar and (once scrolled) the sticky header.
+    Demoted both to `tier={1}`, matching the `Button` fix's reasoning: the fill/border
+    alone reads as "raised" without adding a third live blur.
+  - Conditional, one-at-a-time surfaces were left alone as designed: the three `HeatStrip`
+    date-popovers (`buddies/[id]`, `progress`, `community/[id]/member/[userId]`) and
+    `Sheet.tsx` itself, all `tier={3}`, only ever open one at a time and are the plan's own
+    "whatever sheet is open" second slot — same reasoning `Sheet.tsx`'s own header comment
+    already documents for why its scrim isn't blurred.
+  - Per-screen tally after the fixes: Home (out of scope for this pass, verified compliant
+    as-is) = tab bar + `TodayControl`'s one documented slider blur = 2. Progress, Buddies
+    (list + detail), Community (list + detail + member drill-down), and Settings = tab bar
+    (always) + sticky header (only once scrolled) = at most 2, with nothing else ever
+    blurring at the same time now that `Button`'s glass variant and the two `tier={2}`
+    cards are unblurred. Verified live at 375×812 on all of those (screenshots below).
+- **`zinc-*`/`dark:`/`emerald-500`/`red-600` sweep** — grepped all of `src/` for each
+  pattern. Zero survivors in any component or page file; the only remaining `dark:` and
+  `zinc-` mentions in the whole tree are in `globals.css`'s own comment explaining *why*
+  the `@custom-variant dark` override exists (so old `dark:zinc-*` pairs elsewhere would
+  degrade gracefully if any still existed) — there's nothing left for it to apply to.
+  D1's/D4's/D9's/D10's own file-by-file stripping already finished this; nothing new here.
+- **PWA sanity check** — `public/manifest.json`'s one icon entry had been a placeholder
+  since D1 (`favicon.ico`, `sizes: "any"`, explicitly deferred to "D11 polish, or sooner
+  if the user wants to supply one" — see D1's own entry above). No image-editing
+  dependency exists in this project (no `sharp`, no canvas lib), so
+  `scripts/generate-icons.mjs` hand-encodes real PNGs directly (PNG chunk framing +
+  `zlib.deflateSync`, no new dependency) — a `--sage` progress-ring mark (the same motif
+  as the Home screen's `Ring` component) on a flat `--bg-canvas` square, full-bleed to the
+  edges so the same file works as both a normal and a maskable icon, with the ring kept
+  inside the maskable 80% safe-zone circle. Generates `icon-192.png`, `icon-512.png`
+  (both `"purpose": "any maskable"` in the manifest) and `apple-touch-icon.png` (180×180).
+  `layout.tsx`'s `metadata.icons` now points at all three instead of relying on the
+  default `favicon.ico` fallback. Verified served correctly: fetched `/manifest.json` and
+  `/icon-512.png` directly (200 OK, correct JSON/PNG), and checked the rendered `<head>`
+  via `document.querySelectorAll('link[rel*="icon"], link[rel="manifest"]')` shows all
+  four links (`manifest`, two sized `icon`s, `apple-touch-icon`) pointing at the new
+  files. Can't actually install to a home screen from this environment, as the plan
+  itself notes — this is as far as "verify the served output is correct" goes.
+- **Found, not fixed — flagged for a follow-up, not one of the five checklist items**:
+  `Screen.tsx`'s `action` prop renders twice in the DOM (sticky header + full-title row,
+  cross-faded by scroll position, never unmounted) on every screen that passes one. Beyond
+  the blur-stacking issue above (now fixed), this means the same interactive element
+  appears twice in the accessibility tree — confirmed live via `read_page`, which showed
+  two identical `link "New" href="/community/new"` entries at once on `/community`. A
+  screen-reader user swiping through the page hits the same action twice. Not a contrast
+  issue (item 2) and not something the five listed checks asked for, so left alone rather
+  than restructuring a shared primitive this late in the pass; worth its own follow-up.
+- `npx tsc --noEmit`, `npx eslint src`, `npx vitest run` (56/56, unchanged — nothing in
+  this step is scoring/rollup logic), and `npx next build` all clean.
+- Verified live at 375×812, signed in as the primary account via
+  `node scripts/dev-login.mjs arihantjain4309@gmail.com --port 3000` (this session's own
+  `next dev`, no port conflict this time): screenshotted Home, Progress, Buddies list,
+  a buddy detail, Community list, a community detail (both above and scrolled past the
+  sticky header into Members/Edit rules), and the member drill-down; checked Settings and
+  confirmed the "Edit profile" glass button and disabled "Save time zone" button both read
+  correctly with the de-blurred `glass-2` styling. No new console errors on any screen —
+  the only ones present are the pre-existing, out-of-scope `hero-disc.png` 404s the task
+  explicitly deferred (Home's from-scratch redesign is waiting on that image from a
+  different session).

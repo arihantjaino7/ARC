@@ -26,8 +26,13 @@ export default async function AppLayout({
   const unread = await getUnreadSections();
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <main className="flex flex-1 flex-col pb-4">{children}</main>
+    <div className="flex min-h-full flex-1 flex-col">
+      <main
+        className="flex flex-1 flex-col"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 96px)" }}
+      >
+        {children}
+      </main>
       <TabBar unread={unread} />
     </div>
   );

@@ -11,7 +11,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/Screen";
-import { MetricPicker, RuleEditor } from "@/components/RuleEditor";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { fieldLabelClass, fieldInputClass, MetricPicker, RuleEditor } from "@/components/RuleEditor";
 import { proposeChange, respondToChange, type ProposeChangeInput } from "@/lib/challenges/actions";
 import {
   newCustomRule,
@@ -20,22 +22,14 @@ import {
   type RuleDraft,
   type ScoreboardRuleSummary,
 } from "@/lib/challenges/types";
-import { BUILTIN_METRICS, findMetric } from "@/lib/metrics/types";
+import { findMetric, type MetricDef } from "@/lib/metrics/types";
 import type { GoalShape } from "@/lib/goals/types";
-
-const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
-const labelClass = "block text-xs font-medium text-zinc-600 dark:text-zinc-400";
-const primaryBtn =
-  "rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black";
-const ghostBtn =
-  "rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-50";
 
 type Mode = "add" | "edit" | "remove";
 
-function describeProposedRule(rule: ChangeRequest["rule"]): string {
+function describeProposedRule(rule: ChangeRequest["rule"], metrics: readonly MetricDef[]): string {
   if (!rule) return "";
-  const label = findMetric(BUILTIN_METRICS, rule.metricKey)?.label ?? rule.metricKey;
+  const label = findMetric(metrics, rule.metricKey)?.label ?? rule.metricKey;
   const scopeNote = rule.scope === "own" ? " (each sets their own)" : "";
   if (rule.shape === "boolean" && rule.schedule?.mode === "flexible") {
     return `${label} — ${rule.schedule.sessionsPerWeek}x/week`;
@@ -52,12 +46,14 @@ export function ChangeRequestPanel({
   buddyLabel,
   liveRules,
   pending,
+  metrics: initialMetrics,
 }: {
   challengeId: string;
   currentUserId: string;
   buddyLabel: string;
   liveRules: ScoreboardRuleSummary[];
   pending: ChangeRequest[];
+  metrics: MetricDef[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -66,9 +62,10 @@ export function ChangeRequestPanel({
   const [draft, setDraft] = useState<RuleDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<MetricDef[]>(initialMetrics);
 
   const usedMetricKeys = useMemo(() => new Set(liveRules.map((r) => r.metricKey)), [liveRules]);
-  const addableMetrics = BUILTIN_METRICS.filter((m) => !usedMetricKeys.has(m.key));
+  const addableMetrics = metrics.filter((m) => !usedMetricKeys.has(m.key));
 
   const waitingOnMe = pending.filter((r) => r.proposedBy !== currentUserId);
   const waitingOnThem = pending.filter((r) => r.proposedBy === currentUserId);
@@ -85,7 +82,7 @@ export function ChangeRequestPanel({
     if (!rule) return;
     setMode("edit");
     setTargetRuleId(rule.id);
-    const label = findMetric(BUILTIN_METRICS, rule.metricKey)?.label ?? rule.metricKey;
+    const label = findMetric(metrics, rule.metricKey)?.label ?? rule.metricKey;
     setDraft(newCustomRule(rule.metricKey, label, rule.shape));
     setOpen(true);
     setError(null);
@@ -132,48 +129,52 @@ export function ChangeRequestPanel({
 
   return (
     <Card className="space-y-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Rule changes
-      </p>
+      <p className="text-overline text-ink-faint">Rule changes</p>
 
       {waitingOnMe.length > 0 && (
         <div className="space-y-2">
           {waitingOnMe.map((req) => (
-            <RespondCard key={req.id} request={req} buddyLabel={buddyLabel} onDone={() => router.refresh()} />
+            <RespondCard
+              key={req.id}
+              request={req}
+              buddyLabel={buddyLabel}
+              metrics={metrics}
+              onDone={() => router.refresh()}
+            />
           ))}
         </div>
       )}
 
       {waitingOnThem.map((req) => (
-        <p key={req.id} className="text-xs text-zinc-500 dark:text-zinc-400">
+        <p key={req.id} className="text-caption text-ink-muted">
           {req.kind === "add" ? "Adding" : req.kind === "remove" ? "Removing" : "Editing"}
-          {req.rule ? ` ${describeProposedRule(req.rule)}` : ""} — waiting on {buddyLabel} to respond.
+          {req.rule ? ` ${describeProposedRule(req.rule, metrics)}` : ""} — waiting on {buddyLabel} to respond.
         </p>
       ))}
 
       {!open && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={startAdd} disabled={addableMetrics.length === 0} className={ghostBtn}>
+          <Button type="button" variant="glass" size="sm" onClick={startAdd} disabled={addableMetrics.length === 0}>
             Propose adding a rule
-          </button>
+          </Button>
           {liveRules.length > 0 && (
             <>
-              <button type="button" onClick={startEdit} className={ghostBtn}>
+              <Button type="button" variant="glass" size="sm" onClick={startEdit}>
                 Propose an edit
-              </button>
-              <button type="button" onClick={startRemove} className={ghostBtn}>
+              </Button>
+              <Button type="button" variant="glass" size="sm" onClick={startRemove}>
                 Propose removing a rule
-              </button>
+              </Button>
             </>
           )}
         </div>
       )}
 
       {open && (
-        <div className="space-y-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+        <div className="space-y-3 border-t border-glass-1-border pt-3">
           {(mode === "edit" || mode === "remove") && (
             <div>
-              <label className={labelClass}>Which rule</label>
+              <label className={fieldLabelClass}>Which rule</label>
               <select
                 value={targetRuleId}
                 onChange={(e) => {
@@ -181,16 +182,17 @@ export function ChangeRequestPanel({
                   if (mode === "edit") {
                     const rule = liveRules.find((r) => r.id === e.target.value);
                     if (rule) {
-                      const label = findMetric(BUILTIN_METRICS, rule.metricKey)?.label ?? rule.metricKey;
+                      const label = findMetric(metrics, rule.metricKey)?.label ?? rule.metricKey;
                       setDraft(newCustomRule(rule.metricKey, label, rule.shape));
                     }
                   }
                 }}
-                className={inputClass}
+                style={{ fontSize: 16 }}
+                className={`mt-1 w-full ${fieldInputClass}`}
               >
                 {liveRules.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {findMetric(BUILTIN_METRICS, r.metricKey)?.label ?? r.metricKey}
+                    {findMetric(metrics, r.metricKey)?.label ?? r.metricKey}
                   </option>
                 ))}
               </select>
@@ -199,12 +201,17 @@ export function ChangeRequestPanel({
 
           {mode === "add" && (
             <div>
-              <label className={labelClass}>Metric</label>
+              <label className={fieldLabelClass}>Metric</label>
               <MetricPicker
                 metrics={addableMetrics}
                 value={draft?.metricKey ?? ""}
                 onChange={changeAddMetric}
+                onMetricCreated={(m) => {
+                  setMetrics((prev) => [...prev, m]);
+                  setDraft(newCustomRule(m.key, m.label, m.default_shape));
+                }}
                 placeholder="Choose a metric…"
+                className="mt-1 w-full"
               />
             </div>
           )}
@@ -214,18 +221,18 @@ export function ChangeRequestPanel({
           )}
 
           {error && (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="text-caption text-clay">
               {error}
             </p>
           )}
 
           <div className="flex gap-2">
-            <button type="button" onClick={submit} disabled={submitting} className={primaryBtn}>
+            <Button type="button" size="sm" onClick={submit} disabled={submitting}>
               {submitting ? "Sending…" : "Send to " + buddyLabel}
-            </button>
-            <button type="button" onClick={() => setOpen(false)} className={ghostBtn}>
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -236,10 +243,12 @@ export function ChangeRequestPanel({
 function RespondCard({
   request,
   buddyLabel,
+  metrics,
   onDone,
 }: {
   request: ChangeRequest;
   buddyLabel: string;
+  metrics: readonly MetricDef[];
   onDone: () => void;
 }) {
   const [ownTarget, setOwnTarget] = useState<{ target: string; min: string; max: string }>({
@@ -277,10 +286,10 @@ function RespondCard({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-      <p className="text-sm text-black dark:text-zinc-50">
+    <Card className="p-3">
+      <p className="text-body text-ink">
         {buddyLabel} wants to {request.kind === "add" ? "add" : request.kind === "remove" ? "remove" : "change"}
-        {request.rule ? ` ${describeProposedRule(request.rule)}` : " a rule"}
+        {request.rule ? ` ${describeProposedRule(request.rule, metrics)}` : " a rule"}
         {request.kind !== "remove" && ", starting tomorrow."}
       </p>
 
@@ -288,47 +297,47 @@ function RespondCard({
         <div className="mt-2">
           {shape === "range" ? (
             <div className="grid grid-cols-2 gap-2">
-              <input
+              <Field
                 type="number"
+                inputMode="decimal"
                 placeholder="Min"
                 value={ownTarget.min}
                 onChange={(e) => setOwnTarget((v) => ({ ...v, min: e.target.value }))}
-                className={inputClass}
               />
-              <input
+              <Field
                 type="number"
+                inputMode="decimal"
                 placeholder="Max"
                 value={ownTarget.max}
                 onChange={(e) => setOwnTarget((v) => ({ ...v, max: e.target.value }))}
-                className={inputClass}
               />
             </div>
           ) : (
-            <input
+            <Field
               type="number"
+              inputMode="decimal"
               placeholder="Your number"
               value={ownTarget.target}
               onChange={(e) => setOwnTarget((v) => ({ ...v, target: e.target.value }))}
-              className={inputClass}
             />
           )}
         </div>
       )}
 
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-1 text-caption text-clay">
           {error}
         </p>
       )}
 
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={() => respond(true)} disabled={submitting !== null} className={primaryBtn}>
+        <Button type="button" size="sm" onClick={() => respond(true)} disabled={submitting !== null}>
           {submitting === "approve" ? "Approving…" : "Approve"}
-        </button>
-        <button type="button" onClick={() => respond(false)} disabled={submitting !== null} className={ghostBtn}>
+        </Button>
+        <Button type="button" variant="glass" size="sm" onClick={() => respond(false)} disabled={submitting !== null}>
           {submitting === "reject" ? "Rejecting…" : "Reject"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }

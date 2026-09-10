@@ -63,9 +63,31 @@ export type LeaderboardMember = {
   todayHidden: boolean;
   total: number;
   perRule: Record<string, ScoredGoal>;
+  /** One score per day from the challenge's start through today. `null` = rest day / not scorable, not a 0. Powers the per-member drill-down's heat strip. */
+  heatStrip: { date: string; score: number | null }[];
   badges: { late: number; edited: number; flagged: number; suspicious: number };
   trustScore: number;
 };
+
+// ---------------------------------------------------------------------------
+// The invite link (supabase/step22_community_invite.sql). Reusable — unlike
+// a buddy invite, one link is meant to be shared with a whole group and
+// stays valid for anyone until the admin revokes it.
+// ---------------------------------------------------------------------------
+
+export type CommunityInvitePreview =
+  | { error: "not_found" }
+  | {
+      communityId: string;
+      name: string;
+      description: string | null;
+      visibility: CommunityVisibility;
+      adminLabel: string;
+      rules: InviteRule[];
+      revoked: boolean;
+      isOwnInvite: boolean;
+      alreadyMember: boolean;
+    };
 
 export type LeaderboardResult = {
   communityId: string;

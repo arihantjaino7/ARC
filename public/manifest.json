@@ -1,0 +1,23 @@
+{
+  "name": "Gym-Shym",
+  "short_name": "Gym-Shym",
+  "description": "Compete with your gym buddy on effort towards your own goal — not who lifted more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1311",
+  "theme_color": "#0e1311",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

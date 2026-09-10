@@ -8,6 +8,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card } from "@/components/Screen";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { submitVerification } from "@/lib/challenges/actions";
 import type { RecentEntry } from "@/lib/challenges/types";
 import { findMetric, metricLabel, BUILTIN_METRICS } from "@/lib/metrics/types";
@@ -21,7 +24,7 @@ function formatValue(entry: RecentEntry): string {
 export function RecentEntriesFeed({ entries }: { entries: RecentEntry[] }) {
   if (entries.length === 0) {
     return (
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+      <p className="text-caption text-ink-muted">
         Nothing logged by them in the last 48 hours yet.
       </p>
     );
@@ -54,49 +57,38 @@ function EntryRow({ entry }: { entry: RecentEntry }) {
   const metricDef = findMetric(BUILTIN_METRICS, entry.metricKey);
 
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
-      <div className="min-w-0">
-        <p className="truncate text-black dark:text-zinc-50">
-          {entry.logDate} &middot; {metricDef ? metricLabel(metricDef) : entry.metricKey}
-        </p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {formatValue(entry)}
-          {entry.isLate && " · late"}
-          {entry.implausible && " · flagged"}
-        </p>
-      </div>
-
-      {state === "disputed" ? (
-        <button
-          type="button"
-          onClick={() => verify("ok")}
-          disabled={pending}
-          className="shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:opacity-40 dark:border-red-900 dark:text-red-400"
-        >
-          Disputed — undo
-        </button>
-      ) : state === "ok" ? (
-        <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">Confirmed</span>
-      ) : (
-        <div className="flex shrink-0 gap-1.5">
-          <button
-            type="button"
-            onClick={() => verify("ok")}
-            disabled={pending}
-            className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-black disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-50"
-          >
-            Confirm
-          </button>
-          <button
-            type="button"
-            onClick={() => verify("disputed")}
-            disabled={pending}
-            className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 disabled:opacity-40 dark:border-red-900 dark:text-red-400"
-          >
-            Flag
-          </button>
+    <li>
+      <Card className="flex items-center justify-between gap-3 p-3">
+        <div className="min-w-0">
+          <p className="truncate text-body text-ink">
+            {entry.logDate} &middot; {metricDef ? metricLabel(metricDef) : entry.metricKey}
+          </p>
+          <p className="text-caption text-ink-muted">
+            {formatValue(entry)}
+            {entry.isLate && " · late"}
+            {entry.implausible && " · flagged"}
+          </p>
         </div>
-      )}
+
+        {state === "disputed" ? (
+          <Button type="button" variant="danger" size="sm" onClick={() => verify("ok")} disabled={pending} className="shrink-0">
+            Disputed — undo
+          </Button>
+        ) : state === "ok" ? (
+          <Chip tone="sage" className="shrink-0">
+            Confirmed
+          </Chip>
+        ) : (
+          <div className="flex shrink-0 gap-1.5">
+            <Button type="button" variant="glass" size="sm" onClick={() => verify("ok")} disabled={pending}>
+              Confirm
+            </Button>
+            <Button type="button" variant="danger" size="sm" onClick={() => verify("disputed")} disabled={pending}>
+              Flag
+            </Button>
+          </div>
+        )}
+      </Card>
     </li>
   );
 }

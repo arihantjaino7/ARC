@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Card } from "@/components/Screen";
-import { MetricPicker, RuleEditor, WEEKDAYS } from "@/components/RuleEditor";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
+import { Pressable } from "@/components/ui/Pressable";
+import { CheckIcon, LinkIcon } from "@/components/ui/icons";
+import { springs } from "@/components/ui/motion";
+import { MetricPicker, RuleEditor, WEEKDAYS, fieldLabelClass, fieldInputClass } from "@/components/RuleEditor";
 import { createChallenge, type CreateChallengeInput } from "@/lib/challenges/actions";
 import {
   CHALLENGE_PRESETS,
@@ -15,20 +22,18 @@ import {
 } from "@/lib/challenges/types";
 import type { Recommendations } from "@/lib/profile/recommendations";
 import { shiftDate } from "@/lib/time/day";
-import { BUILTIN_METRICS } from "@/lib/metrics/types";
+import type { MetricDef } from "@/lib/metrics/types";
 
 export type BuddyOption = { userId: string; email: string };
 
 type DurationMode = "1w" | "30d" | "90d" | "custom";
 type WhoMode = "buddy" | "link";
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
-const labelClass = "block text-sm font-medium text-zinc-700 dark:text-zinc-300";
-const primaryBtn =
-  "rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black";
-const ghostBtn =
-  "rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-black dark:border-zinc-700 dark:text-zinc-50";
+function pillClass(active: boolean): string {
+  return `rounded-chip border px-3 py-1 text-caption ${
+    active ? "border-sage/30 bg-sage/15 text-sage" : "border-glass-1-border text-ink-muted"
+  }`;
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -87,11 +92,14 @@ export function NewChallengeWizard({
   buddies,
   recommendations,
   initialBuddyId,
+  metrics,
 }: {
   buddies: BuddyOption[];
   recommendations: Recommendations | null;
   initialBuddyId: string | null;
+  metrics: MetricDef[];
 }) {
+  const reduceMotion = useReducedMotion();
   const [step, setStep] = useState(1);
 
   const [whoMode, setWhoMode] = useState<WhoMode>(initialBuddyId || buddies.length > 0 ? "buddy" : "link");
@@ -116,8 +124,16 @@ export function NewChallengeWizard({
   const [result, setResult] = useState<{ token: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [metricCatalog, setMetricCatalog] = useState<MetricDef[]>(metrics);
+
   const usedMetricKeys = useMemo(() => new Set(rules.map((r) => r.metricKey)), [rules]);
-  const addableMetrics = BUILTIN_METRICS.filter((m) => !usedMetricKeys.has(m.key));
+  const addableMetrics = metricCatalog.filter((m) => !usedMetricKeys.has(m.key));
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1800);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   function pickPreset(id: ChallengePresetId) {
     setPresetId(id);
@@ -189,25 +205,56 @@ export function NewChallengeWizard({
     const link = typeof window !== "undefined" ? `${window.location.origin}/join/${result.token}` : "";
     return (
       <Card className="space-y-4 text-center">
-        <p className="text-lg font-semibold text-black dark:text-zinc-50">Challenge created 🎉</p>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-title text-ink">Challenge created 🎉</p>
+        <p className="text-body text-ink-muted">
           {whoMode === "buddy"
             ? "It's waiting for them on their Buddies tab — send the link too in case they haven't checked the app."
             : "Send this link to whoever you want in the challenge."}
         </p>
-        <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-left text-xs break-all text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-          {link}
-        </div>
-        <button
+        <motion.div
+          animate={copied ? { boxShadow: "0 0 0 2px rgba(163,201,168,0.5)" } : { boxShadow: "0 0 0 0px rgba(163,201,168,0)" }}
+          transition={{ duration: reduceMotion ? 0 : 0.5 }}
+        >
+          <Surface tier={1} radius="row" className="break-all px-3 py-2.5 text-left text-caption text-ink-muted">
+            {link}
+          </Surface>
+        </motion.div>
+        <Pressable
           type="button"
           onClick={() => {
             navigator.clipboard.writeText(link).then(() => setCopied(true));
           }}
-          className={primaryBtn + " w-full"}
+          className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-row bg-sage text-body font-medium text-bg-void"
         >
-          {copied ? "Copied!" : "Copy link"}
-        </button>
-        <Link href="/buddies" className="block text-sm text-zinc-500 underline dark:text-zinc-400">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {copied ? (
+              <motion.span
+                key="check"
+                initial={reduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                transition={reduceMotion ? { duration: 0 } : springs.snappy}
+                className="inline-flex items-center gap-1.5"
+              >
+                <CheckIcon size={16} />
+                Copied
+              </motion.span>
+            ) : (
+              <motion.span
+                key="copy"
+                initial={reduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                transition={reduceMotion ? { duration: 0 } : springs.snappy}
+                className="inline-flex items-center gap-1.5"
+              >
+                <LinkIcon size={16} />
+                Copy link
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </Pressable>
+        <Link href="/buddies" className="block text-body text-ink-muted underline underline-offset-2">
           Done — back to Buddies
         </Link>
       </Card>
@@ -255,6 +302,10 @@ export function NewChallengeWizard({
           onBlindModeChange={setBlindMode}
           onAddMetricKeyChange={setAddMetricKey}
           onAddRule={addRule}
+          onMetricCreated={(m) => {
+            setMetricCatalog((prev) => [...prev, m]);
+            setAddMetricKey(m.key);
+          }}
         />
       )}
 
@@ -276,28 +327,23 @@ export function NewChallengeWizard({
       )}
 
       <div className="flex items-center justify-between pt-2">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setStep((s) => Math.max(1, s - 1))}
           disabled={step === 1}
-          className={ghostBtn + " disabled:opacity-40"}
         >
           Back
-        </button>
+        </Button>
 
         {step < 6 ? (
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.min(6, s + 1))}
-            disabled={!canProceed[step]}
-            className={primaryBtn}
-          >
+          <Button type="button" onClick={() => setStep((s) => Math.min(6, s + 1))} disabled={!canProceed[step]}>
             Next
-          </button>
+          </Button>
         ) : (
-          <button type="button" onClick={handleSubmit} disabled={submitting} className={primaryBtn}>
+          <Button type="button" onClick={handleSubmit} disabled={submitting}>
             {submitting ? "Creating…" : "Create challenge"}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -308,12 +354,7 @@ function StepDots({ step }: { step: number }) {
   return (
     <div className="flex items-center justify-center gap-1.5">
       {[1, 2, 3, 4, 5, 6].map((s) => (
-        <span
-          key={s}
-          className={`h-1.5 w-1.5 rounded-full ${
-            s === step ? "bg-black dark:bg-white" : "bg-zinc-200 dark:bg-zinc-800"
-          }`}
-        />
+        <span key={s} className={`h-1.5 w-1.5 rounded-full ${s === step ? "bg-sage" : "bg-glass-1-border"}`} />
       ))}
     </div>
   );
@@ -334,43 +375,45 @@ function WhoScreen({
 }) {
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">Who&rsquo;s this with?</h2>
+      <h2 className="text-section text-ink">Who&rsquo;s this with?</h2>
 
       {buddies.length > 0 && (
         <div className="space-y-2">
-          {buddies.map((b) => (
-            <label
-              key={b.userId}
-              className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-sm ${
-                whoMode === "buddy" && buddyId === b.userId
-                  ? "border-black dark:border-white"
-                  : "border-zinc-200 dark:border-zinc-800"
-              }`}
-            >
-              <span className="truncate text-black dark:text-zinc-50">{b.email}</span>
-              <input
-                type="radio"
-                name="buddy"
-                checked={whoMode === "buddy" && buddyId === b.userId}
-                onChange={() => {
-                  onModeChange("buddy");
-                  onBuddyChange(b.userId);
-                }}
-              />
-            </label>
-          ))}
+          {buddies.map((b) => {
+            const active = whoMode === "buddy" && buddyId === b.userId;
+            return (
+              <label key={b.userId} className="block cursor-pointer">
+                <Surface
+                  tier={1}
+                  radius="row"
+                  className={`flex items-center justify-between px-3 py-2.5 text-body ${active ? "border-sage/40!" : ""}`}
+                >
+                  <span className="truncate text-ink">{b.email}</span>
+                  <input
+                    type="radio"
+                    name="buddy"
+                    checked={active}
+                    onChange={() => {
+                      onModeChange("buddy");
+                      onBuddyChange(b.userId);
+                    }}
+                  />
+                </Surface>
+              </label>
+            );
+          })}
         </div>
       )}
 
-      <label
-        className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-sm ${
-          whoMode === "link" ? "border-black dark:border-white" : "border-zinc-200 dark:border-zinc-800"
-        }`}
-      >
-        <span className="text-black dark:text-zinc-50">
-          Send a link{buddies.length === 0 ? " (no buddies yet)" : " instead"}
-        </span>
-        <input type="radio" name="buddy" checked={whoMode === "link"} onChange={() => onModeChange("link")} />
+      <label className="block cursor-pointer">
+        <Surface
+          tier={1}
+          radius="row"
+          className={`flex items-center justify-between px-3 py-2.5 text-body ${whoMode === "link" ? "border-sage/40!" : ""}`}
+        >
+          <span className="text-ink">Send a link{buddies.length === 0 ? " (no buddies yet)" : " instead"}</span>
+          <input type="radio" name="buddy" checked={whoMode === "link"} onChange={() => onModeChange("link")} />
+        </Surface>
       </label>
     </div>
   );
@@ -385,19 +428,18 @@ function KindScreen({
 }) {
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">What kind of challenge?</h2>
+      <h2 className="text-section text-ink">What kind of challenge?</h2>
       <div className="space-y-2">
         {CHALLENGE_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => onPick(preset.id)}
-            className={`w-full rounded-lg border px-4 py-3 text-left ${
-              presetId === preset.id ? "border-black dark:border-white" : "border-zinc-200 dark:border-zinc-800"
-            }`}
-          >
-            <p className="text-sm font-medium text-black dark:text-zinc-50">{preset.name}</p>
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{preset.blurb}</p>
+          <button key={preset.id} type="button" onClick={() => onPick(preset.id)} className="block w-full text-left">
+            <Surface
+              tier={1}
+              radius="card"
+              className={`px-4 py-3 ${presetId === preset.id ? "border-sage/40!" : ""}`}
+            >
+              <p className="text-body font-medium text-ink">{preset.name}</p>
+              <p className="mt-0.5 text-caption text-ink-muted">{preset.blurb}</p>
+            </Surface>
           </button>
         ))}
       </div>
@@ -429,19 +471,10 @@ function DurationScreen({
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">How long?</h2>
+      <h2 className="text-section text-ink">How long?</h2>
       <div className="flex flex-wrap gap-2">
         {chips.map((c) => (
-          <button
-            key={c.mode}
-            type="button"
-            onClick={() => onPick(c.mode)}
-            className={`rounded-full border px-4 py-2 text-sm ${
-              durationMode === c.mode
-                ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                : "border-zinc-300 text-black dark:border-zinc-700 dark:text-zinc-50"
-            }`}
-          >
+          <button key={c.mode} type="button" onClick={() => onPick(c.mode)} className={pillClass(durationMode === c.mode)}>
             {c.label}
           </button>
         ))}
@@ -450,29 +483,31 @@ function DurationScreen({
       {durationMode === "custom" && (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelClass}>Start</label>
+            <label className={fieldLabelClass}>Start</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => onStartChange(e.target.value)}
-              className={inputClass}
+              style={{ fontSize: 16 }}
+              className={`mt-1 w-full ${fieldInputClass}`}
             />
           </div>
           <div>
-            <label className={labelClass}>End</label>
+            <label className={fieldLabelClass}>End</label>
             <input
               type="date"
               value={endDate}
               min={startDate}
               onChange={(e) => onEndChange(e.target.value)}
-              className={inputClass}
+              style={{ fontSize: 16 }}
+              className={`mt-1 w-full ${fieldInputClass}`}
             />
           </div>
         </div>
       )}
 
       {durationMode !== "custom" && (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="text-caption text-ink-muted">
           {startDate} &rarr; {endDate}
         </p>
       )}
@@ -493,12 +528,13 @@ function RulesScreen({
   onBlindModeChange,
   onAddMetricKeyChange,
   onAddRule,
+  onMetricCreated,
 }: {
   rules: RuleDraft[];
   rulesErrors: string[];
   advancedOpen: boolean;
   blindMode: boolean;
-  addableMetrics: typeof BUILTIN_METRICS;
+  addableMetrics: MetricDef[];
   addMetricKey: string;
   onUpdateRule: (key: string, patch: Partial<RuleDraft>) => void;
   onRemoveRule: (key: string) => void;
@@ -506,21 +542,22 @@ function RulesScreen({
   onBlindModeChange: (v: boolean) => void;
   onAddMetricKeyChange: (v: string) => void;
   onAddRule: () => void;
+  onMetricCreated: (metric: MetricDef) => void;
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">The rules</h2>
+      <h2 className="text-section text-ink">The rules</h2>
 
       <div className="space-y-3">
         {rules.map((rule) => (
           <Card key={rule.key} className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-black dark:text-zinc-50">{rule.label}</p>
+              <p className="text-body font-medium text-ink">{rule.label}</p>
               {rules.length > 1 && (
                 <button
                   type="button"
                   onClick={() => onRemoveRule(rule.key)}
-                  className="text-xs text-red-600 underline dark:text-red-400"
+                  className="text-caption text-clay underline underline-offset-2"
                 >
                   Remove
                 </button>
@@ -532,42 +569,34 @@ function RulesScreen({
         ))}
       </div>
 
-      {addableMetrics.length > 0 && (
-        <div className="flex gap-2">
-          <MetricPicker
-            metrics={addableMetrics}
-            value={addMetricKey}
-            onChange={onAddMetricKeyChange}
-            className="flex-1"
-          />
-          <button
-            type="button"
-            onClick={onAddRule}
-            disabled={!addMetricKey}
-            className={ghostBtn + " disabled:opacity-40"}
-          >
-            Add
-          </button>
-        </div>
-      )}
+      <div className="flex gap-2">
+        <MetricPicker
+          metrics={addableMetrics}
+          value={addMetricKey}
+          onChange={onAddMetricKeyChange}
+          onMetricCreated={onMetricCreated}
+          className="flex-1"
+        />
+        <Button type="button" variant="glass" onClick={onAddRule} disabled={!addMetricKey}>
+          Add
+        </Button>
+      </div>
 
-      <button
-        type="button"
-        onClick={onToggleAdvanced}
-        className="text-xs text-zinc-500 underline dark:text-zinc-400"
-      >
+      <button type="button" onClick={onToggleAdvanced} className="text-caption text-ink-muted underline underline-offset-2">
         {advancedOpen ? "Hide advanced" : "Advanced (weights, proof, fixed gym days, blind mode)"}
       </button>
 
       {advancedOpen && (
-        <label className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2.5 text-sm dark:border-zinc-800">
-          <span className="text-black dark:text-zinc-50">Blind mode (hide today&rsquo;s number until you log)</span>
-          <input type="checkbox" checked={blindMode} onChange={(e) => onBlindModeChange(e.target.checked)} />
+        <label className="block">
+          <Surface tier={1} radius="row" className="flex items-center justify-between px-3 py-2.5 text-body">
+            <span className="text-ink">Blind mode (hide today&rsquo;s number until you log)</span>
+            <input type="checkbox" checked={blindMode} onChange={(e) => onBlindModeChange(e.target.checked)} />
+          </Surface>
         </label>
       )}
 
       {rulesErrors.length > 0 && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-body text-clay">
           {rulesErrors[0]}
         </p>
       )}
@@ -578,14 +607,13 @@ function RulesScreen({
 function StakeScreen({ stakeText, onChange }: { stakeText: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">Stake (optional)</h2>
-      <input
+      <h2 className="text-section text-ink">Stake (optional)</h2>
+      <Field
         type="text"
         value={stakeText}
         maxLength={200}
         placeholder="Loser buys coffee"
         onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
       />
     </div>
   );
@@ -616,48 +644,37 @@ function ReviewScreen({
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">Review &amp; send</h2>
+      <h2 className="text-section text-ink">Review &amp; send</h2>
 
-      <div>
-        <label className={labelClass}>Name</label>
-        <input
-          type="text"
-          value={name}
-          maxLength={60}
-          onChange={(e) => onNameChange(e.target.value)}
-          className={inputClass}
-        />
-      </div>
+      <Field label="Name" type="text" value={name} maxLength={60} onChange={(e) => onNameChange(e.target.value)} />
 
-      <Card className="space-y-2 text-sm">
-        <p className="text-black dark:text-zinc-50">
-          <span className="text-zinc-500 dark:text-zinc-400">With: </span>
+      <Card className="space-y-2 text-body">
+        <p className="text-ink">
+          <span className="text-ink-muted">With: </span>
           {whoMode === "buddy" ? buddyEmail : "anyone with the link"}
         </p>
-        <p className="text-black dark:text-zinc-50">
-          <span className="text-zinc-500 dark:text-zinc-400">Duration: </span>
+        <p className="text-ink">
+          <span className="text-ink-muted">Duration: </span>
           {startDate} &rarr; {endDate}
         </p>
         <ul className="mt-1 space-y-1">
           {rules.map((r) => (
-            <li key={r.key} className="text-black dark:text-zinc-50">
+            <li key={r.key} className="text-ink">
               &middot; {describeRule(r)}
             </li>
           ))}
         </ul>
         {stakeText && (
-          <p className="text-black dark:text-zinc-50">
-            <span className="text-zinc-500 dark:text-zinc-400">Stake: </span>
+          <p className="text-ink">
+            <span className="text-ink-muted">Stake: </span>
             {stakeText}
           </p>
         )}
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Blind mode is {blindMode ? "on" : "off"}.
-        </p>
+        <p className="text-caption text-ink-muted">Blind mode is {blindMode ? "on" : "off"}.</p>
       </Card>
 
       {submitError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-body text-clay">
           {submitError}
         </p>
       )}

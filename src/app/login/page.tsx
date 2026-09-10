@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Suspense, useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import { login, type AuthState } from "@/lib/auth/actions";
+import { Stagger } from "@/components/ui/Stagger";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
 
 const initialState: AuthState = {};
 
@@ -22,81 +25,61 @@ function LoginForm() {
   const next = useSearchParams().get("next") ?? "/";
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-6 py-16 dark:bg-black">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-          Log in
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Welcome back.
-        </p>
+    <div className="flex min-h-dvh flex-1 flex-col items-center justify-center px-gutter py-16">
+      <Stagger className="w-full max-w-sm">
+        <Stagger.Item>
+          <h1 className="text-title text-ink">Log in</h1>
+          <p className="mt-1 text-body text-ink-muted">Welcome back.</p>
+        </Stagger.Item>
 
-        <form action={formAction} className="mt-8 space-y-4">
-          <input type="hidden" name="next" value={next} />
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-            />
-          </div>
+        <Stagger.Item>
+          <form action={formAction} className="mt-8 space-y-4">
+            <input type="hidden" name="next" value={next} />
+            <Field id="email" name="email" label="Email" type="email" autoComplete="email" required />
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Password
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-xs text-zinc-500 underline dark:text-zinc-400"
-              >
-                Forgot it?
-              </Link>
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-caption text-ink-muted">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="text-caption text-ink-muted underline underline-offset-2">
+                  Forgot it?
+                </Link>
+              </div>
+              <Field
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="mt-1.5"
+              />
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-            />
-          </div>
 
-          {state?.error && (
-            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-              {state.error}
-            </p>
-          )}
+            {state?.error && (
+              <p role="alert" className="text-body text-clay">
+                {state.error}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
-            {pending ? "Logging in…" : "Log in"}
-          </button>
-        </form>
+            <Button type="submit" disabled={pending} className="w-full">
+              {pending ? "Logging in…" : "Log in"}
+            </Button>
+          </form>
+        </Stagger.Item>
 
-        <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
-          No account?{" "}
-          <Link href={`/signup${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-medium underline">
-            Sign up
-          </Link>
-        </p>
-      </div>
+        <Stagger.Item>
+          <p className="mt-6 text-body text-ink-muted">
+            No account?{" "}
+            <Link
+              href={`/signup${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`}
+              className="font-medium text-sage underline underline-offset-2"
+            >
+              Sign up
+            </Link>
+          </p>
+        </Stagger.Item>
+      </Stagger>
     </div>
   );
 }

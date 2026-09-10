@@ -26,10 +26,15 @@ export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  // /join/<token> is public in the sense that it's not one of the five tab
-  // sections, but accepting an invite needs an account — send a signed-out
-  // visitor to sign up and come straight back here afterwards (V2 Step 7).
-  if (!user && matchesRoute(pathname, "/join")) {
+  // /join/<token> and /community/join/<token> are public in the sense that
+  // they're not one of the five tab sections, but accepting an invite needs
+  // an account — send a signed-out visitor to sign up and come straight back
+  // here afterwards (V2 Step 7; community invite links reuse the same
+  // pattern). /community/join must be checked before the general
+  // PROTECTED_ROUTES loop below, since it's a sub-path of the protected
+  // "/community" route and would otherwise get the generic /login bounce
+  // instead of this next-aware one.
+  if (!user && (matchesRoute(pathname, "/join") || matchesRoute(pathname, "/community/join"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/signup";
     url.search = `?next=${encodeURIComponent(pathname)}`;

@@ -43,3 +43,20 @@ export function findMetric(
 export function metricLabel(metric: MetricDef): string {
   return metric.unit ? `${metric.label} (${metric.unit})` : metric.label;
 }
+
+/**
+ * Turns a free-typed label into a valid `metrics.key` (`^[a-z][a-z0-9_]{0,39}$`,
+ * step11_metrics_entries.sql). Pure so it's usable both client-side (live
+ * preview of the key a custom metric will get) and server-side (actually
+ * deriving it before insert) without duplicating the regex logic.
+ */
+export function slugifyMetricKey(label: string): string {
+  let slug = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!slug) slug = "metric";
+  if (!/^[a-z]/.test(slug)) slug = `m_${slug}`;
+  return slug.slice(0, 40);
+}

@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Card } from "@/components/Screen";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
 import { createGoal, deleteGoal, type GoalState } from "@/lib/goals/actions";
 import {
   GOAL_SHAPES,
@@ -32,43 +35,33 @@ function describeGoal(goal: SavedGoal): string {
 
 const initialState: GoalState = {};
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
-const labelClass =
-  "block text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const selectClass =
+  "w-full min-h-11 rounded-row border border-glass-1-border bg-glass-1 px-4 text-ink outline-none focus:border-sage/50";
+const labelClass = "mb-1.5 block text-caption text-ink-muted";
 
 export function GoalsForm({ goals }: { goals: SavedGoal[] }) {
-  const [state, formAction, pending] = useActionState(
-    createGoal,
-    initialState,
-  );
+  const [state, formAction, pending] = useActionState(createGoal, initialState);
   const [shape, setShape] = useState<GoalShape | "">("");
 
   return (
-    <div className="mt-8 space-y-6">
+    <div className="mt-2 space-y-6">
       {goals.length > 0 && (
         <ul className="space-y-2">
           {goals.map((goal) => (
-            <li
-              key={goal.id}
-              className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800"
-            >
-              <div>
-                <p className="text-sm font-medium text-black dark:text-zinc-50">
-                  {goal.name}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {describeGoal(goal)} &middot; worth {goal.weight}
-                </p>
-              </div>
-              <form action={deleteGoal.bind(null, goal.id)}>
-                <button
-                  type="submit"
-                  className="text-xs text-red-600 underline dark:text-red-400"
-                >
-                  Remove
-                </button>
-              </form>
+            <li key={goal.id}>
+              <Card className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-body font-medium text-ink">{goal.name}</p>
+                  <p className="text-caption text-ink-muted">
+                    {describeGoal(goal)} &middot; worth {goal.weight}
+                  </p>
+                </div>
+                <form action={deleteGoal.bind(null, goal.id)}>
+                  <button type="submit" className="shrink-0 text-caption text-clay underline">
+                    Remove
+                  </button>
+                </form>
+              </Card>
             </li>
           ))}
         </ul>
@@ -77,26 +70,19 @@ export function GoalsForm({ goals }: { goals: SavedGoal[] }) {
       <form
         action={formAction}
         key={state?.message ?? "goal-form"}
-        className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800"
+        className="space-y-4 border-t border-glass-1-border pt-6"
       >
-        <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
-          Add a goal
-        </h2>
+        <h2 className="text-section text-ink">Add a goal</h2>
 
-        <div>
-          <label htmlFor="name" className={labelClass}>
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            required
-            maxLength={60}
-            placeholder="e.g. Protein, Gym, Sleep"
-            className={inputClass}
-          />
-        </div>
+        <Field
+          label="Name"
+          id="name"
+          name="name"
+          type="text"
+          required
+          maxLength={60}
+          placeholder="e.g. Protein, Gym, Sleep"
+        />
 
         <div>
           <label htmlFor="shape" className={labelClass}>
@@ -108,7 +94,8 @@ export function GoalsForm({ goals }: { goals: SavedGoal[] }) {
             required
             value={shape}
             onChange={(e) => setShape(e.target.value as GoalShape)}
-            className={inputClass}
+            className={selectClass}
+            style={{ fontSize: 16 }}
           >
             <option value="" disabled>
               Choose one
@@ -126,7 +113,7 @@ export function GoalsForm({ goals }: { goals: SavedGoal[] }) {
             <label htmlFor="metric" className={labelClass}>
               Counts toward
             </label>
-            <select id="metric" name="metric" required defaultValue="" className={inputClass}>
+            <select id="metric" name="metric" required defaultValue="" className={selectClass} style={{ fontSize: 16 }}>
               <option value="" disabled>
                 Choose one
               </option>
@@ -140,89 +127,49 @@ export function GoalsForm({ goals }: { goals: SavedGoal[] }) {
         )}
 
         {(shape === "at_least" || shape === "at_most") && (
-          <div>
-            <label htmlFor="target" className={labelClass}>
-              Target
-            </label>
-            <input
-              id="target"
-              name="target"
-              type="number"
-              step="any"
-              min={0}
-              required
-              className={inputClass}
-            />
-          </div>
+          <Field
+            label="Target"
+            id="target"
+            name="target"
+            type="number"
+            inputMode="decimal"
+            enterKeyHint="done"
+            step="any"
+            min={0}
+            required
+          />
         )}
 
         {shape === "range" && (
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="min" className={labelClass}>
-                Min
-              </label>
-              <input
-                id="min"
-                name="min"
-                type="number"
-                step="any"
-                min={0}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="max" className={labelClass}>
-                Max
-              </label>
-              <input
-                id="max"
-                name="max"
-                type="number"
-                step="any"
-                min={0}
-                required
-                className={inputClass}
-              />
-            </div>
+            <Field label="Min" id="min" name="min" type="number" inputMode="decimal" step="any" min={0} required />
+            <Field label="Max" id="max" name="max" type="number" inputMode="decimal" step="any" min={0} required />
           </div>
         )}
 
-        <div>
-          <label htmlFor="weight" className={labelClass}>
-            Worth (1-5)
-          </label>
-          <input
-            id="weight"
-            name="weight"
-            type="number"
-            min={1}
-            max={5}
-            defaultValue={1}
-            required
-            className={inputClass}
-          />
-        </div>
+        <Field
+          label="Worth (1-5)"
+          id="weight"
+          name="weight"
+          type="number"
+          inputMode="numeric"
+          enterKeyHint="done"
+          min={1}
+          max={5}
+          defaultValue={1}
+          required
+        />
 
         {state?.error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="text-body text-clay">
             {state.error}
           </p>
         )}
-        {state?.message && (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">
-            {state.message}
-          </p>
-        )}
+        {state?.message && <p className="text-body text-sage">{state.message}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        >
+        <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Adding…" : "Add goal"}
-        </button>
+        </Button>
       </form>
     </div>
   );

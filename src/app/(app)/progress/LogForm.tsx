@@ -5,11 +5,13 @@ import { saveDayLog, type LogState } from "@/lib/logs/actions";
 import { FIELD_PREFIX, type DayLog } from "@/lib/logs/types";
 import { metricLabel, type MetricDef } from "@/lib/metrics/types";
 import { EntryBadges } from "@/components/EntryBadges";
+import { Field } from "@/components/ui/Field";
+import { Chip } from "@/components/ui/Chip";
+import { Button } from "@/components/ui/Button";
+import { Pressable } from "@/components/ui/Pressable";
+import { CheckIcon } from "@/components/ui/icons";
 
 const initialState: LogState = {};
-
-const inputClass =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
 
 export function LogForm({
   metrics,
@@ -38,7 +40,7 @@ export function LogForm({
   const [showExtra, setShowExtra] = useState(loggedExtra);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="log_date" value={log?.date ?? ""} />
 
       {primary.map((metric) => (
@@ -52,30 +54,25 @@ export function LogForm({
       ))}
 
       {primary.length === 0 && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-body text-ink-muted">
           Nothing is being tracked yet — open the list below, or set some goals.
         </p>
       )}
 
       {extra.length > 0 && (
-        <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <div className="border-t border-glass-1-border pt-4">
           <button
             type="button"
             onClick={() => setShowExtra((v) => !v)}
-            className="text-sm font-medium text-zinc-600 underline underline-offset-2 dark:text-zinc-400"
+            className="text-body font-medium text-ink-muted underline underline-offset-2"
           >
             {showExtra ? "Hide" : "Track something else"}
           </button>
 
           {showExtra && (
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 space-y-5">
               {extra.map((metric) => (
-                <MetricField
-                  key={metric.key}
-                  metric={metric}
-                  log={log}
-                  disabled={!editable}
-                />
+                <MetricField key={metric.key} metric={metric} log={log} disabled={!editable} />
               ))}
             </div>
           )}
@@ -83,21 +80,15 @@ export function LogForm({
       )}
 
       {state?.error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-body text-clay">
           {state.error}
         </p>
       )}
-      {state?.message && (
-        <p className="text-sm text-emerald-600 dark:text-emerald-400">{state.message}</p>
-      )}
+      {state?.message && <p className="text-body text-sage">{state.message}</p>}
 
-      <button
-        type="submit"
-        disabled={pending || !editable}
-        className="w-full rounded-lg bg-black px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-      >
+      <Button type="submit" disabled={pending || !editable} className="w-full">
         {pending ? "Saving…" : "Save"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -120,7 +111,7 @@ function MetricField({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={name} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label htmlFor={name} className="text-body font-medium text-ink">
           {metricLabel(metric)}
         </label>
         {entry && (
@@ -134,29 +125,29 @@ function MetricField({
       </div>
 
       {feeds && feeds.length > 0 && (
-        <p className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-600">
-          Feeds {feeds.join(" · ")}
-        </p>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {feeds.map((name) => (
+            <Chip key={name} tone="sage">
+              {name}
+            </Chip>
+          ))}
+        </div>
       )}
 
-      <div className="mt-1">
+      <div className="mt-2">
         {metric.value_type === "boolean" ? (
-          <BooleanField
-            name={name}
-            initial={entry?.value_bool ?? false}
-            disabled={disabled}
-          />
+          <BooleanField name={name} initial={entry?.value_bool ?? false} disabled={disabled} />
         ) : (
-          <input
+          <Field
             id={name}
             name={name}
             type="number"
             inputMode="decimal"
+            enterKeyHint="done"
             step={metric.step}
             min={0}
             disabled={disabled}
             defaultValue={entry?.value_num ?? ""}
-            className={inputClass}
           />
         )}
       </div>
@@ -178,19 +169,20 @@ function BooleanField({
   return (
     <>
       <input type="hidden" name={name} value={on ? "true" : "false"} />
-      <button
+      <Pressable
         id={name}
         type="button"
         disabled={disabled}
         onClick={() => setOn((v) => !v)}
-        className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-60 ${
+        className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-row border text-body font-medium disabled:opacity-60 ${
           on
-            ? "border-emerald-600 bg-emerald-600 text-white"
-            : "border-zinc-300 bg-white text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            ? "border-sage/30 bg-sage/15 text-sage"
+            : "border-glass-1-border bg-glass-1 text-ink"
         }`}
       >
-        {on ? "Done ✓" : "Not yet"}
-      </button>
+        {on && <CheckIcon size={16} />}
+        {on ? "Done" : "Not yet"}
+      </Pressable>
     </>
   );
 }

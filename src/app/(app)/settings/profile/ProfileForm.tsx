@@ -15,6 +15,8 @@ import {
   calculateRecommendations,
   isValidRecommendationInput,
 } from "@/lib/profile/recommendations";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
 
 const ACTIVITY_LABELS: Record<(typeof ACTIVITY_LEVELS)[number], string> = {
   sedentary: "Sedentary (little to no exercise)",
@@ -37,10 +39,9 @@ const SEX_LABELS: Record<(typeof SEXES)[number], string> = {
 
 const initialState: ProfileState = {};
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50";
-const labelClass =
-  "block text-sm font-medium text-zinc-700 dark:text-zinc-300";
+const selectClass =
+  "mt-1 w-full min-h-11 rounded-row border border-glass-1-border bg-glass-1 px-4 text-ink outline-none focus:border-sage/50";
+const labelClass = "block text-caption text-ink-muted";
 
 type Targets = {
   calories: string;
@@ -114,58 +115,49 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
 
   return (
     <form action={formAction} className="mt-8 space-y-4">
-      <div>
-        <label htmlFor="age" className={labelClass}>
-          Age
-        </label>
-        <input
-          id="age"
-          name="age"
-          type="number"
-          min={13}
-          max={100}
-          required
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-          className={inputClass}
-        />
-      </div>
+      <Field
+        id="age"
+        name="age"
+        label="Age"
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="next"
+        min={13}
+        max={100}
+        required
+        value={age}
+        onChange={(e) => setAge(e.target.value)}
+      />
 
-      <div>
-        <label htmlFor="height_cm" className={labelClass}>
-          Height (cm)
-        </label>
-        <input
-          id="height_cm"
-          name="height_cm"
-          type="number"
-          step="0.1"
-          min={100}
-          max={250}
-          required
-          value={heightCm}
-          onChange={(e) => setHeightCm(e.target.value)}
-          className={inputClass}
-        />
-      </div>
+      <Field
+        id="height_cm"
+        name="height_cm"
+        label="Height (cm)"
+        type="number"
+        inputMode="decimal"
+        enterKeyHint="next"
+        step="0.1"
+        min={100}
+        max={250}
+        required
+        value={heightCm}
+        onChange={(e) => setHeightCm(e.target.value)}
+      />
 
-      <div>
-        <label htmlFor="weight_kg" className={labelClass}>
-          Weight (kg)
-        </label>
-        <input
-          id="weight_kg"
-          name="weight_kg"
-          type="number"
-          step="0.1"
-          min={30}
-          max={300}
-          required
-          value={weightKg}
-          onChange={(e) => setWeightKg(e.target.value)}
-          className={inputClass}
-        />
-      </div>
+      <Field
+        id="weight_kg"
+        name="weight_kg"
+        label="Weight (kg)"
+        type="number"
+        inputMode="decimal"
+        enterKeyHint="next"
+        step="0.1"
+        min={30}
+        max={300}
+        required
+        value={weightKg}
+        onChange={(e) => setWeightKg(e.target.value)}
+      />
 
       <div>
         <label htmlFor="sex" className={labelClass}>
@@ -177,7 +169,8 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           required
           value={sex}
           onChange={(e) => setSex(e.target.value as Sex)}
-          className={inputClass}
+          style={{ fontSize: 16 }}
+          className={selectClass}
         >
           <option value="" disabled>
             Choose one
@@ -188,9 +181,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Used by the calorie formula only.
-        </p>
+        <p className="mt-1 text-caption text-ink-faint">Used by the calorie formula only.</p>
       </div>
 
       <div>
@@ -203,7 +194,8 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           required
           value={activityLevel}
           onChange={(e) => setActivityLevel(e.target.value as ActivityLevel)}
-          className={inputClass}
+          style={{ fontSize: 16 }}
+          className={selectClass}
         >
           <option value="" disabled>
             Choose one
@@ -226,7 +218,8 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           required
           value={aim}
           onChange={(e) => setAim(e.target.value as Aim)}
-          className={inputClass}
+          style={{ fontSize: 16 }}
+          className={selectClass}
         >
           <option value="" disabled>
             Choose one
@@ -239,114 +232,92 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         </select>
       </div>
 
-      <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <div className="border-t border-glass-1-border pt-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
-            Daily targets
-          </h2>
+          <h2 className="text-section text-ink">Daily targets</h2>
           {targetsTouched && suggestion && (
             <button
               type="button"
               onClick={resetTargetsToSuggested}
-              className="text-xs text-zinc-500 underline dark:text-zinc-400"
+              className="text-caption text-ink-muted underline underline-offset-2"
             >
               Use suggested
             </button>
           )}
         </div>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-caption text-ink-muted">
           {suggestion
             ? "Calculated from your stats above. Change any of them."
             : "Fill in your stats above to see suggested numbers."}
         </p>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="target_calories" className={labelClass}>
-              Calories
-            </label>
-            <input
-              id="target_calories"
-              name="target_calories"
-              type="number"
-              min={800}
-              max={6000}
-              required
-              value={displayedTargets.calories}
-              onChange={(e) => editTarget("calories", e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="target_protein_g" className={labelClass}>
-              Protein (g)
-            </label>
-            <input
-              id="target_protein_g"
-              name="target_protein_g"
-              type="number"
-              min={0}
-              max={500}
-              required
-              value={displayedTargets.protein_g}
-              onChange={(e) => editTarget("protein_g", e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="target_water_ml" className={labelClass}>
-              Water (ml)
-            </label>
-            <input
-              id="target_water_ml"
-              name="target_water_ml"
-              type="number"
-              min={0}
-              max={10000}
-              required
-              value={displayedTargets.water_ml}
-              onChange={(e) => editTarget("water_ml", e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="target_sleep_hours" className={labelClass}>
-              Sleep (hours)
-            </label>
-            <input
-              id="target_sleep_hours"
-              name="target_sleep_hours"
-              type="number"
-              step="0.5"
-              min={0}
-              max={14}
-              required
-              value={displayedTargets.sleep_hours}
-              onChange={(e) => editTarget("sleep_hours", e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          <Field
+            id="target_calories"
+            name="target_calories"
+            label="Calories"
+            type="number"
+            inputMode="numeric"
+            enterKeyHint="next"
+            min={800}
+            max={6000}
+            required
+            value={displayedTargets.calories}
+            onChange={(e) => editTarget("calories", e.target.value)}
+          />
+          <Field
+            id="target_protein_g"
+            name="target_protein_g"
+            label="Protein (g)"
+            type="number"
+            inputMode="numeric"
+            enterKeyHint="next"
+            min={0}
+            max={500}
+            required
+            value={displayedTargets.protein_g}
+            onChange={(e) => editTarget("protein_g", e.target.value)}
+          />
+          <Field
+            id="target_water_ml"
+            name="target_water_ml"
+            label="Water (ml)"
+            type="number"
+            inputMode="numeric"
+            enterKeyHint="next"
+            min={0}
+            max={10000}
+            required
+            value={displayedTargets.water_ml}
+            onChange={(e) => editTarget("water_ml", e.target.value)}
+          />
+          <Field
+            id="target_sleep_hours"
+            name="target_sleep_hours"
+            label="Sleep (hours)"
+            type="number"
+            inputMode="decimal"
+            enterKeyHint="done"
+            step="0.5"
+            min={0}
+            max={14}
+            required
+            value={displayedTargets.sleep_hours}
+            onChange={(e) => editTarget("sleep_hours", e.target.value)}
+          />
         </div>
       </div>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-body text-clay">
           {state.error}
         </p>
       )}
-      {state?.message && (
-        <p className="text-sm text-emerald-600 dark:text-emerald-400">
-          {state.message}
-        </p>
-      )}
+      {state?.message && <p className="text-body text-sage">{state.message}</p>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-      >
+      <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Saving…" : "Save profile"}
-      </button>
+      </Button>
     </form>
   );
 }

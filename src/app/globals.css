@@ -1,24 +1,185 @@
 @import "tailwindcss";
 
+/* Dark-only app: `dark:` utilities are gated on this class (set on <html> in
+   layout.tsx) instead of Tailwind's default `prefers-color-scheme` media
+   query, so the design doesn't change with the visiting device's OS setting.
+   The existing `dark:zinc-*` pairs sprinkled through the app keep working
+   unchanged against this — see docs/PLAN-DESIGN.md §7 on `dark:` variant debt
+   getting stripped file-by-file as later phases touch each screen. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Raw token values on :root (not directly in @theme) so a future light theme
+   could redefine these under e.g. `:root[data-theme="light"]` without
+   touching every call site — see docs/PLAN-DESIGN.md §1 and §7. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ground */
+  --bg-void: #0a0e0c;
+  --bg-canvas: #0e1311;
+
+  /* ink */
+  --ink: #e8ede9;
+  --ink-muted: #9aa79f;
+  /* WCAG AA check (D11): the original #6b7770 measured ~4.0:1 against
+     --bg-canvas, just under the 4.5:1 normal-text floor — this value
+     measures ~4.6:1, a real pass with a small margin, same hue. */
+  --ink-faint: #75817a;
+
+  /* accent */
+  --sage: #a3c9a8;
+  --lime: #d6e4b0;
+  --moss: #4f7a5b;
+  --ochre: #d9b26a;
+  --clay: #c97b6b;
+
+  /* glass tiers — fills and borders already carry their own alpha */
+  --glass-1: rgba(255, 255, 255, 0.045);
+  --glass-1-border: rgba(255, 255, 255, 0.07);
+  --glass-2: rgba(255, 255, 255, 0.075);
+  --glass-2-border: rgba(255, 255, 255, 0.11);
+  --glass-3: rgba(16, 23, 19, 0.72);
+  --glass-3-border: rgba(255, 255, 255, 0.09);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg-void: var(--bg-void);
+  --color-bg-canvas: var(--bg-canvas);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-sage: var(--sage);
+  --color-lime: var(--lime);
+  --color-moss: var(--moss);
+  --color-ochre: var(--ochre);
+  --color-clay: var(--clay);
+
+  --color-glass-1: var(--glass-1);
+  --color-glass-1-border: var(--glass-1-border);
+  --color-glass-2: var(--glass-2);
+  --color-glass-2-border: var(--glass-2-border);
+  --color-glass-3: var(--glass-3);
+  --color-glass-3-border: var(--glass-3-border);
+
+  /* shape */
+  --radius-chip: 10px;
+  --radius-row: 18px;
+  --radius-card: 24px;
+  --radius-hero: 32px;
+
+  /* space */
+  --spacing-gutter: 20px;
+
+  /* the 1px top inner highlight every glass surface gets — see §1.2 */
+  --shadow-glass-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* type scale — §1.4. Sizes only; weight/tracking/leading ride along as
+     Tailwind v4's font-size companion properties. */
+  --text-hero: 68px;
+  --text-hero--line-height: 1;
+  --text-hero--letter-spacing: -0.045em;
+  --text-hero--font-weight: 700;
+
+  --text-title: 28px;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.022em;
+  --text-title--font-weight: 600;
+
+  --text-section: 15px;
+  --text-section--line-height: 1.35;
+  --text-section--letter-spacing: -0.01em;
+  --text-section--font-weight: 600;
+
+  --text-body: 14px;
+  --text-body--line-height: 1.45;
+  --text-body--font-weight: 400;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 1.35;
+  --text-caption--font-weight: 500;
+
+  --text-overline: 10.5px;
+  --text-overline--line-height: 1.2;
+  --text-overline--letter-spacing: 0.14em;
+  --text-overline--font-weight: 600;
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  background: var(--bg-canvas);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+  background: var(--bg-canvas);
+  color: var(--ink);
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+  /* Bottom safe area is already handled by TabBar.tsx's own padding — adding
+     it again here would double up. Top isn't owned by anything yet. */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Ambient blooms (§1.1) — two large fixed radial gradients behind everything,
+   the thing that makes the glass tiers actually read as glass instead of
+   flat grey. Pseudo-elements on body rather than an extra DOM node. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: bloom-drift 30s ease-in-out infinite alternate;
+}
+
+body::before {
+  top: -15vw;
+  left: -15vw;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(163, 201, 168, 0.07), transparent 70%);
+}
+
+body::after {
+  bottom: -20vw;
+  right: -20vw;
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle, rgba(201, 168, 123, 0.04), transparent 70%);
+  animation-delay: -15s;
+}
+
+@keyframes bloom-drift {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(4px, 4px);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

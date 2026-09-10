@@ -1,6 +1,7 @@
 import { Screen } from "@/components/Screen";
 import { createClient } from "@/lib/supabase/server";
 import { getFriendData } from "@/lib/friends/actions";
+import { getMetrics } from "@/lib/metrics/actions";
 import { getProfile } from "@/lib/profile/actions";
 import { calculateRecommendations, isValidRecommendationInput } from "@/lib/profile/recommendations";
 import { NewChallengeWizard, type BuddyOption } from "./NewChallengeWizard";
@@ -11,9 +12,10 @@ export default async function NewChallengePage(props: PageProps<"/buddies/new">)
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ friends }, profile, params] = await Promise.all([
+  const [{ friends }, profile, metrics, params] = await Promise.all([
     getFriendData(),
     getProfile(),
+    getMetrics(),
     props.searchParams,
   ]);
 
@@ -42,6 +44,7 @@ export default async function NewChallengePage(props: PageProps<"/buddies/new">)
         buddies={buddies}
         recommendations={recommendations}
         initialBuddyId={initialBuddyId}
+        metrics={metrics}
       />
     </Screen>
   );

@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/Screen";
+import { Button } from "@/components/ui/Button";
 import { markStakeSettled } from "@/lib/challenges/actions";
 import type { StakeEntry } from "@/lib/challenges/types";
 
@@ -15,7 +16,7 @@ export function StakeLedger({ entries }: { entries: StakeEntry[] }) {
 
   return (
     <section className="mt-6">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">Stake ledger</h2>
+      <h2 className="text-section text-ink">Stake ledger</h2>
       <ul className="mt-2 space-y-2">
         {entries.map((entry) => (
           <li key={entry.challengeId}>
@@ -56,33 +57,28 @@ function LedgerRow({ entry }: { entry: StakeEntry }) {
     <Card className={bothSettled ? "opacity-60" : ""}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-black dark:text-zinc-50">{entry.name}</p>
-          <p className={`mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 ${bothSettled ? "line-through" : ""}`}>
+          <p className="truncate text-body font-medium text-ink">{entry.name}</p>
+          <p className={`mt-0.5 text-caption text-ink-muted ${bothSettled ? "line-through" : ""}`}>
             {verdict}
           </p>
         </div>
         {!entry.isTie && (
-          <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-600">
+          <span className="shrink-0 text-caption text-ink-faint">
             {bothSettled ? "Settled ✓" : entry.mySettled ? "Waiting on them" : ""}
           </span>
         )}
       </div>
 
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-1 text-caption text-clay">
           {error}
         </p>
       )}
 
       {!entry.isTie && !entry.mySettled && (
-        <button
-          type="button"
-          onClick={settle}
-          disabled={pending}
-          className="mt-2 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-black disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-50"
-        >
+        <Button type="button" variant="glass" size="sm" onClick={settle} disabled={pending} className="mt-2">
           {pending ? "Marking…" : "Mark settled"}
-        </button>
+        </Button>
       )}
     </Card>
   );

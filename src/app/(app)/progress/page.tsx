@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Card, Screen } from "@/components/Screen";
+import { Surface } from "@/components/ui/Surface";
+import { Chip } from "@/components/ui/Chip";
+import { Bar } from "@/components/ui/Bar";
+import { Ticker } from "@/components/ui/Ticker";
 import { getGoals } from "@/lib/goals/actions";
-import { getDayLog } from "@/lib/logs/actions";
+import { getDayLog, getMyHeatStrip } from "@/lib/logs/actions";
 import { toDayValues } from "@/lib/logs/types";
 import { getMetrics } from "@/lib/metrics/actions";
 import { findMetric, metricLabel } from "@/lib/metrics/types";
@@ -9,6 +13,7 @@ import { scoreDay, type GoalScore } from "@/lib/scoring/scoreDay";
 import type { MetricDef } from "@/lib/metrics/types";
 import { getMyActiveChallenges, getScoreboard } from "@/lib/challenges/actions";
 import { LogForm } from "./LogForm";
+import { HeatStrip } from "./HeatStrip";
 
 function describeTarget(goal: GoalScore["goal"]): string {
   switch (goal.shape) {
@@ -47,6 +52,7 @@ export default async function ProgressPage() {
   ]);
 
   const { goals: goalScores, total } = scoreDay(goals, toDayValues(log));
+  const heatStrip = await getMyHeatStrip(goals);
 
   // The union of every metric something needs today: personal goals, plus
   // every live rule on every active buddy challenge (V2 Step 12) — this is
@@ -83,24 +89,30 @@ export default async function ProgressPage() {
       subtitle={log ? `Logging ${log.date} · ${log.tz}` : "Logging today"}
     >
       {log?.editState === "grace" && (
-        <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-          You&rsquo;re editing yesterday. This day locks at 10:00 your time.
-        </p>
+        <Surface tier={1} radius="row" className="mb-4 flex items-center gap-2 px-3 py-2.5">
+          <Chip tone="ochre">Grace</Chip>
+          <p className="text-caption text-ink-muted">
+            You&rsquo;re editing yesterday. This day locks at 10:00 your time.
+          </p>
+        </Surface>
       )}
       {log?.editState === "locked" && (
-        <p className="mb-4 rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
-          This day is locked and can&rsquo;t be changed.
-        </p>
+        <Surface tier={1} radius="row" className="mb-4 flex items-center gap-2 px-3 py-2.5">
+          <Chip>Locked</Chip>
+          <p className="text-caption text-ink-muted">This day is locked and can&rsquo;t be changed.</p>
+        </Surface>
       )}
 
-      <Card>
+      {/* tier 1, not 2 (D11 blur-budget fix): this card is always on screen
+          alongside the tab bar and Screen's own sticky header, which already
+          uses the §1.2-budgeted second blur layer — glass-1's fill/border
+          reads as "raised" just as well without adding a third. */}
+      <Surface tier={1} radius="card" className="p-4">
         <div className="flex items-baseline justify-between">
-          <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">
-            Today
-          </p>
-          <p className="text-2xl font-bold tracking-tight text-black dark:text-zinc-50">
-            {total}
-            <span className="text-sm font-medium text-zinc-400">/100</span>
+          <p className="text-overline text-ink-faint">Today</p>
+          <p className="text-title text-ink">
+            <Ticker value={total} />
+            <span className="text-caption font-medium text-ink-faint">/100</span>
           </p>
         </div>
 
@@ -113,23 +125,26 @@ export default async function ProgressPage() {
             editable={editable ?? true}
           />
         </div>
-      </Card>
+      </Surface>
+
+      <div className="mt-6">
+        <p className="text-overline text-ink-faint">Last 30 days</p>
+        <Card className="mt-2">
+          <HeatStrip cells={heatStrip} />
+          <p className="mt-3 text-caption text-ink-faint">Blank cells are days nothing was logged.</p>
+        </Card>
+      </div>
 
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
-            Your goals
-          </h2>
-          <Link
-            href="/goals"
-            className="text-xs text-zinc-500 underline underline-offset-2 dark:text-zinc-400"
-          >
+          <h2 className="text-section text-ink">Your goals</h2>
+          <Link href="/goals" className="text-caption text-ink-muted underline underline-offset-2">
             Edit goals
           </Link>
         </div>
 
         {goals.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-body text-ink-muted">
             No goals yet.{" "}
             <Link href="/goals" className="underline">
               Add some
@@ -138,30 +153,24 @@ export default async function ProgressPage() {
           </p>
         ) : (
           <ul className="mt-2 space-y-2">
-            {goalScores.map((goalScore) => (
-              <li
-                key={goalScore.goal.id}
-                className="rounded-lg border border-zinc-200 px-3 py-2.5 dark:border-zinc-800"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
-                      {goalScore.goal.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                      {describeActual(goalScore, metrics)}
-                    </p>
+            {goalScores.map((goalScore, i) => (
+              <li key={goalScore.goal.id}>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-body font-medium text-ink">{goalScore.goal.name}</p>
+                      <p className="mt-0.5 truncate text-caption text-ink-muted">
+                        {describeActual(goalScore, metrics)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-body font-semibold tabular-nums text-ink">
+                      {goalScore.score}
+                    </span>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-black dark:text-zinc-50">
-                    {goalScore.score}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                  <div
-                    className="h-full rounded-full bg-emerald-500"
-                    style={{ width: `${goalScore.score}%` }}
-                  />
-                </div>
+                  <div className="mt-2">
+                    <Bar score={goalScore.score} index={i} />
+                  </div>
+                </Card>
               </li>
             ))}
           </ul>
@@ -170,25 +179,18 @@ export default async function ProgressPage() {
 
       {challengeCards.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
-            Your challenges
-          </h2>
+          <h2 className="text-section text-ink">Your challenges</h2>
           <ul className="mt-2 space-y-2">
-            {challengeCards.map((c) => (
+            {challengeCards.map((c, i) => (
               <li key={c.id}>
                 <Link href={c.kind === "community" ? "/community" : "/buddies"} className="block">
                   <Card>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-medium text-black dark:text-zinc-50">{c.name}</p>
-                      <span className="shrink-0 text-sm font-semibold text-black dark:text-zinc-50">
-                        {c.total}
-                      </span>
+                      <p className="truncate text-body font-medium text-ink">{c.name}</p>
+                      <span className="shrink-0 text-body font-semibold tabular-nums text-ink">{c.total}</span>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                      <div
-                        className="h-full rounded-full bg-black dark:bg-white"
-                        style={{ width: `${Math.max(0, Math.min(100, c.total))}%` }}
-                      />
+                    <div className="mt-2">
+                      <Bar score={c.total} index={i} />
                     </div>
                   </Card>
                 </Link>
@@ -198,7 +200,7 @@ export default async function ProgressPage() {
         </div>
       )}
 
-      <p className="mt-6 text-xs text-zinc-400 dark:text-zinc-600">
+      <p className="mt-6 text-caption text-ink-faint">
         Tracking{" "}
         {required.length > 0
           ? required

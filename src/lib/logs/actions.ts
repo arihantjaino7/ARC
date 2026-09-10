@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getMetrics } from "@/lib/metrics/actions";
-import { dayEditState, localDate } from "@/lib/time/day";
-import { FIELD_PREFIX, type DayLog, type LogEntry } from "./types";
+import { dayEditState, localDate, shiftDate } from "@/lib/time/day";
+import { scoreDay } from "@/lib/scoring/scoreDay";
+import type { SavedGoal } from "@/lib/goals/types";
+import { FIELD_PREFIX, type DayLog, type DayValues, type LogEntry } from "./types";
 
 export type LogState = {
   error?: string;
@@ -184,4 +186,54 @@ export async function saveDayLog(
   revalidatePath("/");
 
   return { message: "Saved." };
+}
+
+export type HeatCell = { date: string; score: number | null };
+
+/**
+ * The last `days` days scored against the caller's own goals, for the
+ * Progress screen's heat strip (docs/PLAN-DESIGN.md §3.1 #9) — the personal
+ * equivalent of the per-challenge heat strips getScoreboard()/
+ * getCommunityLeaderboard() already compute. `null` means nothing was logged
+ * that day (or there are no goals to score against yet), rendered as a blank
+ * cell rather than a punishing 0 — the same "rest day, not a miss" rule
+ * those other strips already use.
+ */
+export async function getMyHeatStrip(goals: SavedGoal[], days = 30): Promise<HeatCell[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const tz = await timezoneFor(user.id);
+  const today = localDate(tz);
+  const startDate = shiftDate(today, -(days - 1));
+
+  const { data } = await supabase
+    .from("log_entries")
+    .select("log_date, metric_key, value_num, value_bool")
+    .eq("user_id", user.id)
+    .gte("log_date", startDate)
+    .lte("log_date", today);
+
+  const byDate = new Map<string, DayValues>();
+  for (const row of data ?? []) {
+    const date = row.log_date as string;
+    const values = byDate.get(date) ?? {};
+    values[row.metric_key as string] =
+      (row.value_bool as boolean | null) ?? (row.value_num === null ? null : Number(row.value_num));
+    byDate.set(date, values);
+  }
+
+  const cells: HeatCell[] = [];
+  for (let i = 0; i < days; i++) {
+    const date = shiftDate(startDate, i);
+    const values = byDate.get(date);
+    const logged = goals.length > 0 && values !== undefined && Object.keys(values).length > 0;
+    cells.push({ date, score: logged ? scoreDay(goals, values!).total : null });
+  }
+
+  return cells;
 }

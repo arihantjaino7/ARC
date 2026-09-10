@@ -11,17 +11,19 @@
 
 import { useState, useTransition } from "react";
 import { Card } from "@/components/Screen";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { MetricPicker, RuleEditor } from "@/components/RuleEditor";
 import { editCommunityRule } from "@/lib/communities/actions";
 import { newCustomRule, toRuleInput, type RuleDraft } from "@/lib/challenges/types";
 import type { InviteRule } from "@/lib/challenges/actions";
-import { findMetric, BUILTIN_METRICS } from "@/lib/metrics/types";
+import { findMetric, type MetricDef } from "@/lib/metrics/types";
 
-function ruleToDraft(rule: InviteRule): RuleDraft {
+function ruleToDraft(rule: InviteRule, metrics: readonly MetricDef[]): RuleDraft {
   return {
     key: rule.id,
     metricKey: rule.metricKey,
-    label: findMetric(BUILTIN_METRICS, rule.metricKey)?.label ?? rule.metricKey,
+    label: findMetric(metrics, rule.metricKey)?.label ?? rule.metricKey,
     shape: rule.shape,
     scope: "shared",
     target: rule.target,
@@ -35,21 +37,30 @@ function ruleToDraft(rule: InviteRule): RuleDraft {
   };
 }
 
-export function CommunityRulePanel({ communityId, liveRules }: { communityId: string; liveRules: InviteRule[] }) {
+export function CommunityRulePanel({
+  communityId,
+  liveRules,
+  metrics: initialMetrics,
+}: {
+  communityId: string;
+  liveRules: InviteRule[];
+  metrics: MetricDef[];
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RuleDraft | null>(null);
   const [addMetricKey, setAddMetricKey] = useState("");
   const [adding, setAdding] = useState<RuleDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [metrics, setMetrics] = useState<MetricDef[]>(initialMetrics);
 
   const usedMetrics = new Set(liveRules.map((r) => r.metricKey));
-  const addableMetrics = BUILTIN_METRICS.filter((m) => !usedMetrics.has(m.key));
+  const addableMetrics = metrics.filter((m) => !usedMetrics.has(m.key));
 
   function startEdit(rule: InviteRule) {
     setError(null);
     setEditingId(rule.id);
-    setDraft(ruleToDraft(rule));
+    setDraft(ruleToDraft(rule, metrics));
   }
 
   function submitEdit(ruleId: string) {
@@ -95,68 +106,55 @@ export function CommunityRulePanel({ communityId, liveRules }: { communityId: st
 
   return (
     <section className="mt-6">
-      <h2 className="text-sm font-semibold text-black dark:text-zinc-50">Edit rules</h2>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <h2 className="text-section text-ink">Edit rules</h2>
+      <p className="mt-1 text-caption text-ink-muted">
         Changes start tomorrow — today still scores against the current rules.
       </p>
 
-      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-caption text-clay">{error}</p>}
 
       <div className="mt-3 space-y-3">
         {liveRules.map((rule) => {
-          const label = findMetric(BUILTIN_METRICS, rule.metricKey)?.label ?? rule.metricKey;
+          const label = findMetric(metrics, rule.metricKey)?.label ?? rule.metricKey;
           const editable = rule.scope === "shared";
           return (
             <Card key={rule.id}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-black dark:text-zinc-50">{label}</span>
-                <div className="flex shrink-0 gap-3 text-xs">
+                <span className="text-body font-medium text-ink">{label}</span>
+                <div className="flex shrink-0 gap-3 text-caption">
                   {editable && editingId !== rule.id && (
-                    <button
-                      type="button"
-                      onClick={() => startEdit(rule)}
-                      className="text-zinc-600 underline dark:text-zinc-400"
-                    >
+                    <button type="button" onClick={() => startEdit(rule)} className="text-ink-muted underline">
                       Edit
                     </button>
                   )}
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => remove(rule.id)}
-                    className="text-red-600 underline disabled:opacity-40 dark:text-red-400"
-                  >
+                  <button type="button" disabled={pending} onClick={() => remove(rule.id)} className="text-clay underline disabled:opacity-40">
                     Remove
                   </button>
                 </div>
               </div>
               {!editable && (
-                <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Each member sets their own number for this rule — editing it here isn&rsquo;t supported yet.
+                <p className="mt-1">
+                  <Chip>Each sets their own</Chip>
                 </p>
               )}
               {editable && editingId === rule.id && draft && (
-                <div className="mt-3 space-y-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                <div className="mt-3 space-y-3 border-t border-glass-1-border pt-3">
                   <RuleEditor rule={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} showAdvanced />
                   <div className="flex gap-3">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => submitEdit(rule.id)}
-                      className="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
-                    >
+                    <Button type="button" size="sm" disabled={pending} onClick={() => submitEdit(rule.id)}>
                       Save
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      size="sm"
+                      variant="ghost"
                       onClick={() => {
                         setEditingId(null);
                         setDraft(null);
                       }}
-                      className="text-xs text-zinc-600 underline dark:text-zinc-400"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -167,42 +165,35 @@ export function CommunityRulePanel({ communityId, liveRules }: { communityId: st
 
       {adding ? (
         <Card className="mt-3">
-          <p className="text-sm font-medium text-black dark:text-zinc-50">{adding.label}</p>
+          <p className="text-body font-medium text-ink">{adding.label}</p>
           <div className="mt-3 space-y-3">
             <RuleEditor rule={adding} onChange={(patch) => setAdding({ ...adding, ...patch })} showAdvanced />
             <div className="flex gap-3">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={submitAdd}
-                className="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
-              >
+              <Button type="button" size="sm" disabled={pending} onClick={submitAdd}>
                 Add rule
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdding(null)}
-                className="text-xs text-zinc-600 underline dark:text-zinc-400"
-              >
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </Card>
       ) : (
-        addableMetrics.length > 0 && (
-          <div className="mt-3 flex gap-2">
-            <MetricPicker metrics={addableMetrics} value={addMetricKey} onChange={setAddMetricKey} className="flex-1" />
-            <button
-              type="button"
-              onClick={beginAdd}
-              disabled={!addMetricKey}
-              className="shrink-0 rounded-md border border-zinc-300 px-3 py-2 text-xs text-zinc-700 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
-            >
-              Add
-            </button>
-          </div>
-        )
+        <div className="mt-3 flex gap-2">
+          <MetricPicker
+            metrics={addableMetrics}
+            value={addMetricKey}
+            onChange={setAddMetricKey}
+            onMetricCreated={(m) => {
+              setMetrics((prev) => [...prev, m]);
+              setAddMetricKey(m.key);
+            }}
+            className="flex-1"
+          />
+          <Button type="button" variant="glass" size="sm" onClick={beginAdd} disabled={!addMetricKey}>
+            Add
+          </Button>
+        </div>
       )}
     </section>
   );
