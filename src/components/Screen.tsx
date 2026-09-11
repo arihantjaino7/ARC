@@ -5,11 +5,22 @@
 // `back`, `action`, `children`) so no page using it needs to change.
 
 import Link from "next/link";
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import {
+  motion,
+  useMotionValueEvent,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "motion/react";
+import { useState } from "react";
 import { Surface } from "@/components/ui/Surface";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 
 const COLLAPSE_DISTANCE = 56;
+// Same fraction collapsedPointerEvents already used — one threshold, reused
+// for the plain boolean `collapsed` state below instead of a second magic
+// number, so the two can't drift out of sync.
+const COLLAPSE_THRESHOLD = COLLAPSE_DISTANCE * 0.6;
 
 export function Screen({
   title,
@@ -29,18 +40,32 @@ export function Screen({
   const collapsedOpacity = useTransform(scrollY, [0, COLLAPSE_DISTANCE], [0, 1]);
   const fullOpacity = useTransform(scrollY, [0, COLLAPSE_DISTANCE * 0.7], [1, 0]);
   const collapsedPointerEvents = useTransform(scrollY, (v) =>
-    v > COLLAPSE_DISTANCE * 0.6 ? "auto" : "none",
+    v > COLLAPSE_THRESHOLD ? "auto" : "none",
   );
+
+  // `action` is rendered in both the sticky header and the full-title row
+  // below (crossfaded between them by scroll), so without this a click
+  // target — and a screen reader swiping through the page — hits it twice.
+  // `collapsed` is the single source of truth for "which copy is the live
+  // one right now": each copy gets `inert` in the other's state, which pulls
+  // it out of the accessibility tree and tab order regardless of its opacity.
+  const [collapsed, setCollapsed] = useState(false);
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setCollapsed(latest > COLLAPSE_THRESHOLD);
+  });
 
   return (
     <div className="relative mx-auto w-full max-w-md">
       {/* Sticky collapsed header — title shrinks into this glass-3 bar as you
-          scroll past the full title below. */}
+          scroll past the full title below. Under reduced motion this still
+          needs a resting opacity tied to `collapsed` (not `undefined`) —
+          otherwise it and the full-title row below would both render fully
+          opaque at once, since neither has a static default. */}
       <motion.div
         className="sticky top-0 z-10"
         style={
           reduceMotion
-            ? undefined
+            ? { opacity: collapsed ? 1 : 0 }
             : { opacity: collapsedOpacity, pointerEvents: collapsedPointerEvents }
         }
       >
@@ -59,7 +84,7 @@ export function Screen({
             </Link>
           )}
           <span className="min-w-0 flex-1 truncate text-section text-ink">{title}</span>
-          {action}
+          <span inert={!collapsed}>{action}</span>
         </Surface>
       </motion.div>
 
@@ -76,13 +101,13 @@ export function Screen({
 
         <motion.div
           className={`flex items-start justify-between gap-3 ${back ? "mt-3" : ""}`}
-          style={reduceMotion ? undefined : { opacity: fullOpacity }}
+          style={reduceMotion ? { opacity: collapsed ? 0 : 1 } : { opacity: fullOpacity }}
         >
           <div className="min-w-0">
             <h1 className="text-title text-ink break-words">{title}</h1>
             {subtitle && <p className="mt-1 text-body text-ink-muted">{subtitle}</p>}
           </div>
-          {action}
+          <span inert={collapsed}>{action}</span>
         </motion.div>
 
         <div className="mt-6 pb-2">{children}</div>
