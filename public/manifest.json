@@ -1,6 +1,6 @@
 {
-  "name": "Gym-Shym",
-  "short_name": "Gym-Shym",
+  "name": "ARC",
+  "short_name": "ARC",
   "description": "Compete with your gym buddy on effort towards your own goal — not who lifted more.",
   "start_url": "/",
   "display": "standalone",

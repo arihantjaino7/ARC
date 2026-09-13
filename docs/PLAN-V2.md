@@ -1,4 +1,4 @@
-# Gym-Shym V2 — Buddies, Community, Personal, Home, Settings
+# ARC V2 — Buddies, Community, Personal, Home, Settings
 
 This supersedes the "20-step" plan from Step 11 onward. Steps 1-10 (auth, profile,
 recommendation targets, scoring engine, goals, logs, score page, friends) stay and get

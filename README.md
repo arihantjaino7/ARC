@@ -1,4 +1,4 @@
-# Gym-Shym
+# ARC
 
 A fitness competition app where two people compete on percentage of their own goal,
 rather than raw numbers — so a cutter on a calorie ceiling and a bulker on a calorie

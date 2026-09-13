@@ -1,4 +1,4 @@
-# Deploying Gym-Shym to Cloudflare Workers
+# Deploying ARC to Cloudflare Workers
 
 The app runs on Cloudflare Workers via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare)
 (the OpenNext adapter), which runs real Next.js on the Workers runtime rather than
@@ -19,7 +19,7 @@ npm run cf:deploy    # the above, then ship it
 
 1. **Authenticate**: `npx wrangler login` (browser OAuth, stores creds locally).
 2. **Deploy**: `npm run cf:deploy`. The first deploy prints the live URL,
-   `https://gym-shym.<your-subdomain>.workers.dev`.
+   `https://arc.<your-subdomain>.workers.dev`.
 3. **Point Supabase at that URL** — see below. Invite links do not fully work
    until this is done.
 
@@ -40,8 +40,8 @@ request's `host` / `x-forwarded-proto` headers, which Cloudflare sets correctly)
 Supabase refuses redirect targets that aren't allowlisted, so in the
 **Supabase dashboard → Authentication → URL Configuration**:
 
-- **Site URL**: `https://gym-shym.<your-subdomain>.workers.dev`
-- **Redirect URLs**: add `https://gym-shym.<your-subdomain>.workers.dev/**`
+- **Site URL**: `https://arc.<your-subdomain>.workers.dev`
+- **Redirect URLs**: add `https://arc.<your-subdomain>.workers.dev/**`
 
 Without those, a new user invited by link gets their confirmation email, clicks
 it, and lands on the wrong origin (or `localhost`) instead of coming back to the

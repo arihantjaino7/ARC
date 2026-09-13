@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
-	"name": "gym-shym",
+	"name": "arc",
 	"compatibility_date": "2026-09-10",
 	// nodejs_compat: the app runs on the Node.js runtime (Supabase SSR, server
 	// actions, and proxy.ts all need it). global_fetch_strictly_public makes

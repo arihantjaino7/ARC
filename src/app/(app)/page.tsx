@@ -16,7 +16,7 @@ import { RoundButton } from "./_home/RoundButton";
 // Until then HeroDisc draws its own concentric-ring fallback — see its header.
 const HERO_IMAGE_SRC = "/hero-disc.png";
 
-const RIM_TEXT = "GYM-SHYM · CONSISTENCY OVER INTENSITY";
+const RIM_TEXT = "ARC · CONSISTENCY OVER INTENSITY";
 
 // Rotates by day so it's stable within a day but not the same one forever.
 const LINES = [

@@ -1,6 +1,6 @@
 # Architecture
 
-How Gym-Shym is put together: the data model, the trust boundary between Postgres and
+How ARC is put together: the data model, the trust boundary between Postgres and
 TypeScript, the scoring math, and the anti-cheat layers that make the scoring trustworthy
 enough for two people to bet on.
 

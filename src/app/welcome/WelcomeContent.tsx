@@ -17,7 +17,7 @@ export function WelcomeContent() {
   return (
     <Stagger className="flex flex-col items-center">
       <Stagger.Item>
-        <h1 className="text-hero text-ink">Gym-Shym</h1>
+        <h1 className="text-hero text-ink">ARC</h1>
       </Stagger.Item>
       <Stagger.Item>
         <p className="mt-4 max-w-xs text-balance text-body text-ink-muted">

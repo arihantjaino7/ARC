@@ -1,4 +1,4 @@
-# Gym-Shym — Community, split into one-chat steps
+# ARC — Community, split into one-chat steps
 
 ## Context
 
@@ -84,7 +84,7 @@ forgotten:
 
 ## Step C1 — Community tables, and closing the verification hole (SQL only, no UI)
 
-**Say this:** *"Gym-Shym Community step 1: the community tables."*
+**Say this:** *"ARC Community step 1: the community tables."*
 
 Create `supabase/step18_communities.sql`:
 
@@ -127,7 +127,7 @@ No UI yet — same "pure schema step" shape as V2 Step 3.
 
 ## Step C2 — Create a community (the admin authors the template)
 
-**Say this:** *"Gym-Shym Community step 2: creating a community."*
+**Say this:** *"ARC Community step 2: creating a community."*
 
 `src/app/(app)/community/new/` — a short form, not a six-screen wizard: name, description,
 public/private, then the challenge template's rules and dates.
@@ -154,7 +154,7 @@ public/private, then the challenge template's rules and dates.
 
 ## Step C3 — Discovery and joining
 
-**Say this:** *"Gym-Shym Community step 3: browsing and joining communities."*
+**Say this:** *"ARC Community step 3: browsing and joining communities."*
 
 `src/app/(app)/community/page.tsx` stops being a placeholder: your communities at the top,
 then a browsable list of public ones you're not in.
@@ -182,7 +182,7 @@ see its rules — and can request a private one and see "waiting for approval".
 
 ## Step C4 — Approvals and membership management
 
-**Say this:** *"Gym-Shym Community step 4: join requests and member management."*
+**Say this:** *"ARC Community step 4: join requests and member management."*
 
 - Admin view of pending requests, with approve/decline. `respond_to_join_request(...)` RPC:
   approval flips `community_members.status` to `'member'` **and** inserts the
@@ -205,7 +205,7 @@ approves it, and B appears as a member on the leaderboard.
 
 ## Step C5 — The leaderboard and the group aggregate
 
-**Say this:** *"Gym-Shym Community step 5: the leaderboard."*
+**Say this:** *"ARC Community step 5: the leaderboard."*
 
 The scoring half. Two things to build and two to decide.
 
@@ -241,7 +241,7 @@ alongside them, and `npx vitest run` covers `groupAggregate`.
 
 ## Step C6 — Wiring Community into the rest of the app
 
-**Say this:** *"Gym-Shym Community step 6: make communities show up everywhere they should."*
+**Say this:** *"ARC Community step 6: make communities show up everywhere they should."*
 
 The integration pass. Most of this is verification rather than construction, which is the
 point — the app was built kind-agnostic.

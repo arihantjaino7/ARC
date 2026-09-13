@@ -1,6 +1,6 @@
 # Decisions
 
-The non-obvious calls made while building Gym-Shym, and the reasoning behind each. See
+The non-obvious calls made while building ARC, and the reasoning behind each. See
 [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together.
 
 ### Security-definer helper functions instead of self-referencing RLS policies

@@ -8,7 +8,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Gym-Shym",
+  title: "ARC",
   description: "Compete with your gym buddy on effort, not raw numbers.",
   manifest: "/manifest.json",
   icons: {

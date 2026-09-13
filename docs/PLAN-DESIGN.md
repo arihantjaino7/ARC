@@ -1,4 +1,4 @@
-# Gym-Shym — Design language: "Moss"
+# ARC — Design language: "Moss"
 
 Dark forest glass. Earthy, minimal, phone-only. This is the build order for the visual
 pass, the same way `docs/PLAN-COMMUNITY.md` was the build order for Community.
@@ -300,7 +300,7 @@ screenshots are the real gate.
 
 ### Step D0 — Walk the app before changing it
 
-**Say this:** *"Gym-Shym design step D0: walk the app and screenshot the before state."*
+**Say this:** *"ARC design step D0: walk the app and screenshot the before state."*
 
 No code changes. Sign in, set the preview to 375×812, and visit every screen: `/`,
 `/progress`, `/goals`, `/buddies`, `/buddies/new`, a buddy detail, `/community`,
@@ -322,7 +322,7 @@ in `PROGRESS.md` have been deferring for four sessions.
 
 ### Step D1 — The ground: tokens, font, dark-only, PWA
 
-**Say this:** *"Gym-Shym design step D1: tokens, font and the app shell ground."*
+**Say this:** *"ARC design step D1: tokens, font and the app shell ground."*
 
 Files: `src/app/globals.css`, `src/app/layout.tsx`, `public/manifest.json`, icons.
 
@@ -343,7 +343,7 @@ redesigned, and no screen is *broken* — every screen still readable even thoug
 
 ### Step D2 — Motion spec + the core primitives
 
-**Say this:** *"Gym-Shym design step D2: the motion spec and core primitives."*
+**Say this:** *"ARC design step D2: the motion spec and core primitives."*
 
 `npm i motion`. Create `src/components/ui/`: `motion.ts` (springs, easings, variants
 from §3), `Surface.tsx` (three glass tiers, blur budget enforced), `Pressable.tsx`,
@@ -360,7 +360,7 @@ infrastructure and should be a short chat.
 
 ### Step D3 — Sheets, controls, icons
 
-**Say this:** *"Gym-Shym design step D3: sheets, controls and the icon set."*
+**Say this:** *"ARC design step D3: sheets, controls and the icon set."*
 
 `Sheet.tsx` (spring up, drag handle, `drag="y"` velocity dismiss, blurred backdrop),
 `Button.tsx`, `Chip.tsx`, `Field.tsx` (16px minimum, `inputMode`, `enterKeyHint`),
@@ -374,7 +374,7 @@ infrastructure and should be a short chat.
 
 ### Step D4 — The shell
 
-**Say this:** *"Gym-Shym design step D4: the tab bar, Screen frame and route transitions."*
+**Say this:** *"ARC design step D4: the tab bar, Screen frame and route transitions."*
 
 Files: `src/components/TabBar.tsx`, `src/components/Screen.tsx`,
 `src/app/(app)/layout.tsx`, a new `src/app/(app)/template.tsx`.
@@ -392,7 +392,7 @@ tabs.
 
 ### Step D5 — Home
 
-**Say this:** *"Gym-Shym design step D5: the Home screen."*
+**Say this:** *"ARC design step D5: the Home screen."*
 
 File: `src/app/(app)/page.tsx`. Hero `Ring` + `Ticker` replacing the flat bar and
 `text-6xl`; the four-across `IconTile` grid replacing the two flat text boxes; "Today vs
@@ -402,7 +402,7 @@ your challenges" as horizontal snap-scrolling cards.
 
 ### Step D6 — Progress
 
-**Say this:** *"Gym-Shym design step D6: the Progress screen and the log form."*
+**Say this:** *"ARC design step D6: the Progress screen and the log form."*
 
 Files: `src/app/(app)/progress/page.tsx`, `progress/LogForm.tsx`,
 `src/app/(app)/goals/`. Log fields as proper mobile inputs, "what this feeds" chips,
@@ -412,7 +412,7 @@ goal rows on animated `Bar`s, the 30-day heat strip with its stagger and tap-pop
 
 ### Step D7 — Community: list and leaderboard
 
-**Say this:** *"Gym-Shym design step D7: the Community list and leaderboard."*
+**Say this:** *"ARC design step D7: the Community list and leaderboard."*
 
 Files: `src/app/(app)/community/page.tsx`, `community/SearchCommunities.tsx`,
 `community/[id]/page.tsx`.
@@ -426,7 +426,7 @@ physically, and the `layoutId` half of the shared-element morph into the drill-d
 
 ### Step D8 — Community: the rest
 
-**Say this:** *"Gym-Shym design step D8: the remaining Community screens."*
+**Say this:** *"ARC design step D8: the remaining Community screens."*
 
 Files: `community/[id]/member/[userId]/page.tsx` (receives the shared-element morph),
 `community/new/NewCommunityForm.tsx`, `community/[id]/CommunityRulePanel.tsx`,
@@ -439,7 +439,7 @@ so changing it here lands in D9 too; check both.
 
 ### Step D9 — Buddies
 
-**Say this:** *"Gym-Shym design step D9: the Buddies screens."*
+**Say this:** *"ARC design step D9: the Buddies screens."*
 
 Files: `src/app/(app)/buddies/page.tsx`, `SendInviteForm.tsx`, `StakeLedger.tsx`,
 `buddies/[id]/page.tsx`, `ChangeRequestPanel.tsx`, `RecentEntriesFeed.tsx`,
@@ -450,7 +450,7 @@ Files: `src/app/(app)/buddies/page.tsx`, `SendInviteForm.tsx`, `StakeLedger.tsx`
 
 ### Step D10 — Settings and the signed-out screens
 
-**Say this:** *"Gym-Shym design step D10: settings and the signed-out screens."*
+**Say this:** *"ARC design step D10: settings and the signed-out screens."*
 
 Files: `src/app/(app)/settings/`, `settings/profile/ProfileForm.tsx`,
 `TimezoneForm.tsx`, and `/welcome`, `/login`, `/signup`, `/forgot-password`,
@@ -461,7 +461,7 @@ user ever sees — they get real care, not leftovers.
 
 ### Step D11 — Polish
 
-**Say this:** *"Gym-Shym design step D11: the polish pass."*
+**Say this:** *"ARC design step D11: the polish pass."*
 
 Reduced-motion audit across every primitive; WCAG AA contrast check on the final
 palette; 60fps profiling with the §1.2 blur budget actually enforced (count the live
