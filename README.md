@@ -133,3 +133,4 @@ including a documented gap in row-level-security verification coverage.
   model, and anti-cheat layers
 - [docs/DECISIONS.md](docs/DECISIONS.md) — key design decisions and their tradeoffs
 - [docs/DEPLOY.md](docs/DEPLOY.md) — Cloudflare Workers deployment guide
+- [CHANGELOG.md](CHANGELOG.md) — notable, dated engineering milestones
