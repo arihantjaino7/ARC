@@ -50,3 +50,6 @@ cloudflare-env.d.ts
 .claude/
 CLAUDE.md
 AGENTS.md
+
+# Supabase CLI local cache
+supabase/.temp
