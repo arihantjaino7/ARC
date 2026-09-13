@@ -1,5 +1,5 @@
 -- Step 15 (V2 Step 10): propose-and-approve rule changes, plus notifications
--- (docs/PLAN-V2.md §2, §3.4; rippling-leaping-pie.md Step 10).
+-- (docs/PLAN-V2.md §2, §3.4).
 -- Run once via `node scripts/run-sql.mjs supabase/step15_change_requests.sql`.
 --
 -- The whole point: once a challenge is active, nobody can unilaterally change

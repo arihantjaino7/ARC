@@ -1,7 +1,7 @@
 -- Step 24 — product decision: one live buddy challenge per pair at a time,
--- not several running in parallel (the user chose this over "as many as you
--- want" for simplicity — see conversation). Community challenges are
--- unaffected; this only restricts kind = 'buddy'.
+-- not several in parallel — simpler to follow than juggling multiple stakes
+-- with the same person. Community challenges are unaffected; this only
+-- restricts kind = 'buddy'.
 --
 -- "Live" means status in ('pending','active') AND end_date hasn't passed —
 -- a challenge's status is never flipped to 'completed' once its end_date

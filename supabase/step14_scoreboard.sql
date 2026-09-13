@@ -1,5 +1,4 @@
--- Step 14 (V2 Step 8): the challenge scoreboard RPC (docs/PLAN-V2.md §3.5,
--- rippling-leaping-pie.md Step 8).
+-- Step 14 (V2 Step 8): the challenge scoreboard RPC (docs/PLAN-V2.md §3.5).
 -- Run once via `node scripts/run-sql.mjs supabase/step14_scoreboard.sql`.
 --
 -- The buddy comparison view needs BOTH participants' logged values, but

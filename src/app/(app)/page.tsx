@@ -78,8 +78,8 @@ function streakFrom(cells: HeatCell[]): number {
 // there, rather than a new scoring path.
 //
 // Community Step C6: getScoreboard()/getMyActiveChallenges() are already
-// N-participant-capable (confirmed, not assumed — see PROGRESS.md), but this
-// screen's old two-person `participants.find(p => !p.isCaller)` would
+// N-participant-capable, but this screen's old two-person
+// `participants.find(p => !p.isCaller)` would
 // silently pick one arbitrary opponent out of a twenty-member community.
 // Fixed by branching on `kind`: a buddy challenge keeps the exact you-vs-them
 // line; a community challenge shows "you vs the group average" instead — the

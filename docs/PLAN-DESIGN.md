@@ -149,7 +149,7 @@ The current bar is a flat white sticky strip. It becomes a **floating glass pill
 inset 16px from the sides, sitting 12px above the safe-area inset, radius 28, glass-3,
 with a sage indicator pill that **slides** between tabs via `layoutId`.
 
-Labels stay always-visible (the user asked for "very very easy to use" — labels-on-active
+Labels stay always-visible (the brief calls for "very very easy to use" — labels-on-active
 only is a fashion, not usability). Icons scale to 1.08 when active. The unread dot
 becomes sage with a soft glow instead of `bg-red-500`.
 
@@ -260,11 +260,10 @@ so no screen breaks while the phases roll through.
 
 ---
 
-## 6. Build order — one step per chat
+## 6. Build order
 
-Each step is sized for **one fresh chat**, to keep context (and cost) small. Start a chat
-with that step's **Say this** line. Every step ends with something visible and a
-`PROGRESS.md` entry, so the next chat picks up cold.
+Each step is scoped to be small and independently verifiable. Every step ends with
+something visible and working in the running app.
 
 ### Signing in — solved, don't re-solve it
 
@@ -272,7 +271,7 @@ Every design step needs a signed-in browser. Four sessions in a row were blocked
 It now works, and no password is ever typed:
 
 ```bash
-node scripts/dev-login.mjs arihantjain4309@gmail.com
+node scripts/dev-login.mjs you@example.com
 ```
 
 It mints a one-time `hashed_token` via the Auth Admin API (service_role key already in
@@ -288,8 +287,8 @@ The two real accounts, for anything needing two users
 (`node scripts/admin-users.mjs` lists them):
 
 ```
-5057af85-…  arihantjain4309@gmail.com          primary
-85c59a63-…  arihant.gymshym.step3@gmail.com    second account
+5057af85-…  you@example.com          primary
+85c59a63-…  second@example.com       second account
 ```
 
 **Every step below ends with:** `npx tsc --noEmit`, `npx eslint src`, `npx vitest run`

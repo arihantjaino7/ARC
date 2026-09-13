@@ -1,6 +1,6 @@
 // Plain module: types shared by communities/actions.ts (a "use server" file,
-// which may only export async functions — see the Step 5 bugfix note in
-// PROGRESS.md) and the client components that build/render a community.
+// which may only export async functions) and the client components that
+// build/render a community.
 
 import type { InviteRule } from "@/lib/challenges/actions";
 import type { ScoreboardRuleSummary } from "@/lib/challenges/types";

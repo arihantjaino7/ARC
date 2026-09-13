@@ -1,7 +1,7 @@
 -- Step 4: profiles table.
 -- Run this once in the Supabase dashboard -> SQL Editor -> New query -> Run.
 -- (No Supabase CLI/migrations set up for this project yet, so schema changes
--- are applied by hand this way — see PROGRESS.md.)
+-- are applied by hand this way, one numbered file at a time.)
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,

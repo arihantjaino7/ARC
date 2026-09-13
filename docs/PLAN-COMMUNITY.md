@@ -2,11 +2,9 @@
 
 ## Context
 
-Buddies is finished: `docs/PLAN-V2.md` §3-§5 shipped as V2 Steps 1-13, all recorded in
-`PROGRESS.md`. This file is the build order for **Community** (`docs/PLAN-V2.md` §6), the
-same way `C:\Users\Ariha\.claude\plans\rippling-leaping-pie.md` was the build order for
-Buddies. It lives in the repo rather than the plans folder so it sits next to the spec it
-implements.
+Buddies is finished: `docs/PLAN-V2.md` §3-§5 shipped as V2 Steps 1-13. This file is the
+build order for **Community** (`docs/PLAN-V2.md` §6). It lives in the repo, next to the
+spec it implements, rather than in a separate planning location.
 
 The spec, in one paragraph: one **admin** authors a challenge template, members join it
 read-only, `visibility='public'` joins instantly while `'private'` lands as a request the
@@ -52,12 +50,11 @@ exist and were built kind-agnostic on purpose:
 
 ## How to use this file
 
-Each step is sized for **one fresh chat**. Start a chat with the line in that step's
-**Say this** box. Every step ends with something you can see or run, and with a
-`PROGRESS.md` entry so the next chat can pick up cold.
+Each step is scoped to be small and independently verifiable. Every step ends with
+something you can see or run.
 
-**Every chat should begin by reading:** `PROGRESS.md`, then `docs/PLAN-V2.md` §6, then this
-file's step. Project conventions that bite if forgotten:
+Read `docs/PLAN-V2.md` §6 alongside this file's step. Project conventions that bite if
+forgotten:
 
 - Schema changes are `.sql` files under `supabase/`, applied with
   `node scripts/run-sql.mjs supabase/<file>.sql` (service-role key from `.env.local`).
