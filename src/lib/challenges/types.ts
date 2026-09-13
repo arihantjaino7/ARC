@@ -1,8 +1,8 @@
 // Plain module: types shared by the challenge scoring rollup (rollup.ts)
 // and, later, the challenge builder/actions. No DB, no React — same reason
-// as every other feature's types.ts (see the Step 5 bugfix note in
-// PROGRESS.md): a "use server" file may only export async functions, so
-// anything a pure module or client component needs lives here instead.
+// as every other feature's types.ts: a "use server" file may only export
+// async functions, so anything a pure module or client component needs
+// lives here instead.
 
 import type { Goal, ScoredGoal } from "@/lib/scoring/types";
 import type { GoalShape } from "@/lib/goals/types";
@@ -79,8 +79,7 @@ export type RuleDraft = {
  * Moved here (rather than living in challenges/actions.ts, where it was
  * defined through V2 Step 10) so communities/actions.ts can validate the
  * exact same way without either duplicating the logic or importing a value
- * from a "use server" file (which may only export async functions — see the
- * Step 5 bugfix note in PROGRESS.md).
+ * from a "use server" file (which may only export async functions).
  */
 export type RuleInput = Pick<
   RuleDraft,
@@ -458,8 +457,8 @@ export type RecentEntry = {
 // by challenge_scoreboard AND community_leaderboard — both SQL functions
 // build the exact same rule JSON shape) into one participant's ResolvedRule.
 // Lives here, not in challenges/actions.ts, so communities/actions.ts can use
-// it too without importing a value from a "use server" file (see the Step 5
-// bugfix note in PROGRESS.md).
+// it too without importing a value from a "use server" file (which may only
+// export async functions).
 // ---------------------------------------------------------------------------
 
 export type RawRuleTargets = Record<string, { target: number | null; min: number | null; max: number | null } | undefined>;

@@ -45,3 +45,8 @@ next-env.d.ts
 .open-next
 .wrangler
 cloudflare-env.d.ts
+
+# local AI-assistant tooling (editor/agent config, not part of the app)
+.claude/
+CLAUDE.md
+AGENTS.md
