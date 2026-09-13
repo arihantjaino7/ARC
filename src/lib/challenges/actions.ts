@@ -774,9 +774,7 @@ export async function submitVerification(
   } = await supabase.auth.getUser();
   if (!user) return { error: "You're not logged in." };
 
-  const { error } = await supabase
-    .from("verifications")
-    .upsert({ entry_id: entryId, verifier_id: user.id, state }, { onConflict: "entry_id,verifier_id" });
+  const { error } = await supabase.rpc("submit_verification", { p_entry_id: entryId, p_state: state });
 
   if (error) return { error: error.message };
   return {};

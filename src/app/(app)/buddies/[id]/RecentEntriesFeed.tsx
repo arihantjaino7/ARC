@@ -43,15 +43,19 @@ function EntryRow({ entry }: { entry: RecentEntry }) {
   const router = useRouter();
   const [state, setState] = useState(entry.myVerification);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function verify(next: "ok" | "disputed") {
     setPending(true);
+    setError(null);
     const res = await submitVerification(entry.entryId, next);
     setPending(false);
-    if (!res.error) {
-      setState(next);
-      router.refresh();
+    if (res.error) {
+      setError(res.error);
+      return;
     }
+    setState(next);
+    router.refresh();
   }
 
   const metricDef = findMetric(BUILTIN_METRICS, entry.metricKey);
@@ -89,6 +93,11 @@ function EntryRow({ entry }: { entry: RecentEntry }) {
           </div>
         )}
       </Card>
+      {error && (
+        <p role="alert" className="mt-1 text-caption text-clay">
+          {error}
+        </p>
+      )}
     </li>
   );
 }

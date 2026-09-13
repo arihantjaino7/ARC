@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { EmptyState, Screen } from "@/components/Screen";
 import { Button } from "@/components/ui/Button";
-import { UserIcon } from "@/components/ui/icons";
 import { createClient } from "@/lib/supabase/server";
 import { getFriendData } from "@/lib/friends/actions";
 import { getMyChallengesByBuddy, getStakeLedger, type BuddyChallengeSummary } from "@/lib/challenges/actions";
 import { pickChallenge } from "@/lib/challenges/types";
 import { ChallengeCard } from "./ChallengeCard";
 import { StakeLedger } from "./StakeLedger";
+import { FriendsDrawer } from "./FriendsDrawer";
 
 export default async function BuddiesPage() {
   const supabase = await createClient();
@@ -15,7 +15,7 @@ export default async function BuddiesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ friends }, challengesByBuddy, stakeLedger] = await Promise.all([
+  const [{ incoming, outgoing, friends }, challengesByBuddy, stakeLedger] = await Promise.all([
     getFriendData(),
     getMyChallengesByBuddy(),
     getStakeLedger(),
@@ -40,13 +40,12 @@ export default async function BuddiesPage() {
       title="Buddies"
       subtitle="One-on-one challenges. Just you and them."
       leadingAction={
-        <Link
-          href="/buddies/friends"
-          aria-label="Friends"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted"
-        >
-          <UserIcon size={20} />
-        </Link>
+        <FriendsDrawer
+          userId={user?.id}
+          incoming={incoming}
+          outgoing={outgoing}
+          friends={friends}
+        />
       }
       action={
         <Link href="/buddies/new">

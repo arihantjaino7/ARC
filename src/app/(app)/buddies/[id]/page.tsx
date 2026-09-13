@@ -3,28 +3,21 @@ import { Card, EmptyState, Screen } from "@/components/Screen";
 import { Button } from "@/components/ui/Button";
 import { Bar } from "@/components/ui/Bar";
 import { Chip } from "@/components/ui/Chip";
+import { Surface } from "@/components/ui/Surface";
 import { createClient } from "@/lib/supabase/server";
 import { getFriendData } from "@/lib/friends/actions";
-import {
-  getChallengesWithBuddy,
-  getChangeRequestsForChallenge,
-  getRecentEntries,
-  getScoreboard,
-} from "@/lib/challenges/actions";
+import { getChallengesWithBuddy, getRecentEntries, getScoreboard } from "@/lib/challenges/actions";
 import { pickChallenge } from "@/lib/challenges/types";
 import type {
-  ChangeRequest,
   RecentEntry,
   ScoreboardParticipant,
   ScoreboardResult,
   ScoreboardRuleSummary,
 } from "@/lib/challenges/types";
-import { getMetrics } from "@/lib/metrics/actions";
-import { findMetric, BUILTIN_METRICS, type MetricDef } from "@/lib/metrics/types";
+import { findMetric, BUILTIN_METRICS } from "@/lib/metrics/types";
 import { markChallengeNotificationsRead } from "@/lib/notifications/actions";
 import { daysBetween } from "@/lib/time/day";
 import type { ScoredGoal } from "@/lib/scoring/types";
-import { ChangeRequestPanel } from "./ChangeRequestPanel";
 import { RecentEntriesFeed } from "./RecentEntriesFeed";
 import { GraceButton } from "./GraceButton";
 import { RematchButton } from "./RematchButton";
@@ -108,11 +101,9 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
     );
   }
 
-  const [board, changeRequests, recentEntries, metrics] = await Promise.all([
+  const [board, recentEntries] = await Promise.all([
     getScoreboard(chosen.id),
-    getChangeRequestsForChallenge(chosen.id),
     getRecentEntries(chosen.id),
-    getMetrics(),
   ]);
 
   // Opening this screen is what "reads" a change-request notification — no
@@ -137,10 +128,7 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
         <Scoreboard
           board={board}
           challengeId={chosen.id}
-          currentUserId={board.participants.find((p) => p.isCaller)!.userId}
-          pendingChanges={changeRequests.filter((r) => r.status === "pending")}
           recentEntries={"error" in recentEntries ? [] : recentEntries}
-          metrics={metrics}
         />
       )}
     </Screen>
@@ -150,25 +138,22 @@ export default async function BuddyDetailPage(props: PageProps<"/buddies/[id]">)
 export function Scoreboard({
   board,
   challengeId,
-  currentUserId,
-  pendingChanges,
   recentEntries,
-  metrics,
 }: {
   board: ScoreboardResult;
   challengeId?: string;
-  currentUserId?: string;
-  pendingChanges?: ChangeRequest[];
   recentEntries?: RecentEntry[];
-  metrics?: MetricDef[];
 }) {
   const you = board.participants.find((p) => p.isCaller)!;
   const them = board.participants.find((p) => !p.isCaller)!;
 
   return (
     <div className="space-y-6">
+      <WhosAheadCard you={you} them={them} />
+
       <Card>
         <p className="text-overline text-ink-faint">Overall</p>
+        <p className="text-caption text-ink-faint">Since the challenge started</p>
         <div className="mt-3 space-y-3">
           {/* The running total already excludes today's hidden value (unlogged
               scores 0, same rule the rollup applies everywhere else), so
@@ -184,6 +169,7 @@ export function Scoreboard({
 
       <Card>
         <p className="text-overline text-ink-faint">This week</p>
+        <p className="text-caption text-ink-faint">Trailing 7 days</p>
         <div className="mt-3 space-y-3">
           <BarRow label="You" value={you.weekTotal} />
           <BarRow label={them.label} value={them.weekTotal} />
@@ -193,6 +179,7 @@ export function Scoreboard({
 
       <div>
         <p className="mb-2 text-overline text-ink-faint">By rule</p>
+        <p className="mb-2 -mt-1 text-caption text-ink-faint">Each tracked goal, scored on its own</p>
         <div className="space-y-3">
           {board.rules.map((rule) => (
             <Card key={rule.id}>
@@ -250,17 +237,6 @@ export function Scoreboard({
 
       {challengeId && board.endDate < board.callerToday && <RematchButton challengeId={challengeId} />}
 
-      {challengeId && currentUserId && (
-        <ChangeRequestPanel
-          challengeId={challengeId}
-          currentUserId={currentUserId}
-          buddyLabel={them.label}
-          liveRules={board.rules}
-          pending={pendingChanges ?? []}
-          metrics={metrics ?? []}
-        />
-      )}
-
       {recentEntries && (
         <div>
           <p className="mb-2 text-overline text-ink-faint">{them.label}&rsquo;s last 48 hours</p>
@@ -268,6 +244,30 @@ export function Scoreboard({
         </div>
       )}
     </div>
+  );
+}
+
+/** The very first thing shown on this screen: who's ahead overall, and by how much. */
+function WhosAheadCard({ you, them }: { you: ScoreboardParticipant; them: ScoreboardParticipant }) {
+  const youScore = Math.max(0, Math.min(100, Math.round(you.total)));
+  const themScore = Math.max(0, Math.min(100, Math.round(them.total)));
+  const diff = Math.abs(youScore - themScore);
+
+  const headline =
+    youScore === themScore
+      ? "It's a tie"
+      : youScore > themScore
+        ? "You're ahead"
+        : `${them.label} is ahead`;
+
+  return (
+    <Surface tier={1} radius="hero" className="p-5 text-center">
+      <p className="text-title text-ink">{headline}</p>
+      <p className="mt-1 text-body text-ink-muted">
+        {youScore}% (you) vs {themScore}% ({them.label})
+        {diff > 0 && ` · ${diff} point${diff === 1 ? "" : "s"} apart`}
+      </p>
+    </Surface>
   );
 }
 
