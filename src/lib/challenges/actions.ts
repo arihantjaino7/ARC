@@ -79,6 +79,38 @@ export async function createChallenge(input: CreateChallengeInput): Promise<Crea
       )
       .maybeSingle();
     if (!friendship) return { error: "That's not one of your buddies." };
+
+    // One live buddy challenge per pair at a time (product decision, not a
+    // technical limit) — accept_challenge_invite is the actual gate (it also
+    // covers the link-only path below, where no buddy is picked yet), this
+    // is just an earlier, friendlier error for the "pick an existing buddy"
+    // path. "Live" excludes anything past its own end_date, same reasoning
+    // as accept_challenge_invite's — otherwise rematchChallenge (which calls
+    // this function with the same buddyUserId right after the old challenge
+    // ends) would be blocked by its own predecessor.
+    const [{ data: myRows }, { data: buddyRows }] = await Promise.all([
+      supabase.from("challenge_participants").select("challenge_id").eq("user_id", user.id),
+      supabase.from("challenge_participants").select("challenge_id").eq("user_id", input.buddyUserId),
+    ]);
+    const buddyChallengeIds = new Set((buddyRows ?? []).map((r) => r.challenge_id as string));
+    const sharedIds = (myRows ?? [])
+      .map((r) => r.challenge_id as string)
+      .filter((id) => buddyChallengeIds.has(id));
+
+    if (sharedIds.length > 0) {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const { data: liveOnes } = await supabase
+        .from("challenges")
+        .select("id")
+        .in("id", sharedIds)
+        .eq("kind", "buddy")
+        .in("status", ["pending", "active"])
+        .gte("end_date", todayIso)
+        .limit(1);
+      if (liveOnes && liveOnes.length > 0) {
+        return { error: "You already have a challenge running with them. Let it finish first." };
+      }
+    }
   }
 
   const { data: challenge, error: challengeError } = await supabase
@@ -214,6 +246,9 @@ export type InvitePreview =
       full: boolean;
       isOwnInvite: boolean;
       alreadyJoined: boolean;
+      /** One live buddy challenge per pair (product decision) — true when the
+       *  viewer already has a non-ended one with this challenge's creator. */
+      buddyAlreadyBusy: boolean;
     };
 
 export async function getInvitePreview(token: string): Promise<InvitePreview> {

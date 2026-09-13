@@ -119,6 +119,21 @@ export default async function JoinPage(props: PageProps<"/join/[token]">) {
     );
   }
 
+  if (preview.buddyAlreadyBusy) {
+    return (
+      <Shell>
+        <h1 className="text-title text-ink">You&rsquo;re already busy with them</h1>
+        <p className="mt-2 text-body text-ink-muted">
+          You have another challenge running with {preview.inviterLabel} already &mdash; one at a
+          time keeps it simple. Finish that one first, or wait for it to end.
+        </p>
+        <Link href="/buddies" className="mt-6 inline-block text-body text-sage underline underline-offset-2">
+          Go to Buddies
+        </Link>
+      </Shell>
+    );
+  }
+
   const profile = await getProfile();
   const recommendations = profile && isValidRecommendationInput(profile) ? calculateRecommendations(profile) : null;
 
