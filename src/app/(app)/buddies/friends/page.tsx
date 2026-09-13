@@ -1,0 +1,127 @@
+import Link from "next/link";
+import { Card, EmptyState, Screen } from "@/components/Screen";
+import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase/server";
+import {
+  cancelFriendRequest,
+  getFriendData,
+  respondToFriendRequest,
+} from "@/lib/friends/actions";
+import { SendInviteForm } from "../SendInviteForm";
+
+export default async function FriendsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { incoming, outgoing, friends } = await getFriendData();
+  const hasAnything = friends.length + incoming.length + outgoing.length > 0;
+
+  return (
+    <Screen
+      title="Friends"
+      subtitle="Manage who you can start a challenge with."
+      back={{ href: "/buddies", label: "Buddies" }}
+    >
+      {!hasAnything && (
+        <EmptyState
+          title="No friends yet"
+          body="Invite someone below. Once they accept, you can start a challenge with them."
+        />
+      )}
+
+      {incoming.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-section text-ink">Waiting on you</h2>
+          <ul className="mt-2 space-y-2">
+            {incoming.map((req) => (
+              <li key={req.id}>
+                <Card className="flex items-center justify-between gap-3 p-3">
+                  <span className="min-w-0 truncate text-body text-ink">{req.requesterEmail}</span>
+                  <div className="flex shrink-0 gap-3">
+                    <form action={respondToFriendRequest.bind(null, req.id, "accepted")}>
+                      <button type="submit" className="text-caption font-medium text-sage underline underline-offset-2">
+                        Accept
+                      </button>
+                    </form>
+                    <form action={respondToFriendRequest.bind(null, req.id, "declined")}>
+                      <button type="submit" className="text-caption text-clay underline underline-offset-2">
+                        Decline
+                      </button>
+                    </form>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {friends.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-section text-ink">Your friends</h2>
+          <ul className="mt-2 space-y-2">
+            {friends.map((f) => {
+              const email =
+                f.requesterId === user?.id ? f.addresseeEmail : f.requesterEmail;
+              const otherId = f.requesterId === user?.id ? f.addresseeId : f.requesterId;
+              return (
+                <li key={f.id}>
+                  <Card className="flex items-center justify-between gap-3 p-3">
+                    {otherId ? (
+                      <Link
+                        href={`/buddies/${otherId}`}
+                        className="min-w-0 truncate text-body font-medium text-ink underline underline-offset-2"
+                      >
+                        {email}
+                      </Link>
+                    ) : (
+                      <p className="min-w-0 truncate text-body font-medium text-ink">{email}</p>
+                    )}
+                    <Link href={otherId ? `/buddies/new?buddy=${otherId}` : "/buddies/new"} className="shrink-0">
+                      <Button variant="glass" size="sm">
+                        Start a challenge
+                      </Button>
+                    </Link>
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {outgoing.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-section text-ink">Sent</h2>
+          <ul className="mt-2 space-y-2">
+            {outgoing.map((req) => (
+              <li key={req.id}>
+                <Card className="flex items-center justify-between gap-3 p-3">
+                  <span className="min-w-0 truncate text-body text-ink">{req.addresseeEmail}</span>
+                  <form action={cancelFriendRequest.bind(null, req.id)}>
+                    <button type="submit" className="shrink-0 text-caption text-clay underline underline-offset-2">
+                      Cancel
+                    </button>
+                  </form>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="mt-8 border-t border-glass-1-border pt-6">
+        <h2 className="text-section text-ink">Invite a friend</h2>
+        <p className="mt-1 text-caption text-ink-muted">
+          They need an account already &mdash; invites go by email. Invite links
+          arrive with the challenge builder.
+        </p>
+        <div className="mt-3">
+          <SendInviteForm />
+        </div>
+      </section>
+    </Screen>
+  );
+}

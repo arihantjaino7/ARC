@@ -26,12 +26,14 @@ export function Screen({
   title,
   subtitle,
   back,
+  leadingAction,
   action,
   children,
 }: {
   title: string;
   subtitle?: string;
   back?: { href: string; label: string };
+  leadingAction?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -83,6 +85,7 @@ export function Screen({
               <ChevronLeftIcon size={20} />
             </Link>
           )}
+          {leadingAction && <span inert={!collapsed}>{leadingAction}</span>}
           <span className="min-w-0 flex-1 truncate text-section text-ink">{title}</span>
           <span inert={!collapsed}>{action}</span>
         </Surface>
@@ -103,9 +106,12 @@ export function Screen({
           className={`flex items-start justify-between gap-3 ${back ? "mt-3" : ""}`}
           style={reduceMotion ? { opacity: collapsed ? 0 : 1 } : { opacity: fullOpacity }}
         >
-          <div className="min-w-0">
-            <h1 className="text-title text-ink break-words">{title}</h1>
-            {subtitle && <p className="mt-1 text-body text-ink-muted">{subtitle}</p>}
+          <div className="flex min-w-0 items-start gap-3">
+            {leadingAction && <span inert={collapsed}>{leadingAction}</span>}
+            <div className="min-w-0">
+              <h1 className="text-title text-ink break-words">{title}</h1>
+              {subtitle && <p className="mt-1 text-body text-ink-muted">{subtitle}</p>}
+            </div>
           </div>
           <span inert={collapsed}>{action}</span>
         </motion.div>

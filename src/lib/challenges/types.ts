@@ -523,3 +523,21 @@ export type StakeEntry = {
   mySettled: boolean;
   theirSettled: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// Picking "the" challenge to show for a buddy (buddy detail page, and the
+// Buddies tab's card list): a buddy can have more than one challenge on file
+// (completed ones stick around) — this picks the one worth showing, an
+// active challenge beating a still-pending invite, which beats anything
+// already over.
+// ---------------------------------------------------------------------------
+
+export const STATUS_RANK: Record<string, number> = { active: 0, pending: 1, completed: 2, cancelled: 3, draft: 4 };
+
+export function pickChallenge<T extends { status: string; startDate: string }>(challenges: T[]): T | null {
+  if (challenges.length === 0) return null;
+  return [...challenges].sort((a, b) => {
+    const rank = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+    return rank !== 0 ? rank : b.startDate.localeCompare(a.startDate);
+  })[0];
+}
